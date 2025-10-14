@@ -1,446 +1,420 @@
 /**
  * Authentication Service
- * Handles user authentication via Firebase
- * 
- * Required: Firebase SDK must be loaded before this service
- * Include in HTML: <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
- *                  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+ * Handles Firebase Authentication with Demo Mode fallback
  */
 
 const AuthService = {
-  // Firebase auth instance
-  auth: null,
-  
-  // Current user
-  currentUser: null,
-  
-  // Authentication state listeners
-  authStateListeners: [],
+    currentUser: null,
+    isInitialized: false,
+    demoMode: false,
 
-  /**
-   * Initialize Firebase and Auth Service
-   */
-  async init() {
-    try {
-      // Check if Firebase is loaded
-      if (typeof firebase === 'undefined') {
-        Utils.error('Firebase SDK not loaded. Please include Firebase scripts in HTML.');
-        return false;
-      }
+    // Demo users (for testing without Firebase)
+    demoUsers: [
+        { email: 'demo@triumphatlantic.com', password: 'demo123', name: 'Demo User', org: 'Triumph Atlantic' },
+        { email: 'Ryan@triumphatlantic.com', password: 'demo123', name: 'Ryan Morris', org: 'Triumph Atlantic' },
+        { email: 'Rob@triumphatlantic.com', password: 'admin123', name: 'Rob Sebia - Admin User', org: 'Triumph Atlantic' },
+        { email: 'Gianfranco@guerciogroup.com', password: 'demo123', name: 'Gianfranco Guercio', org: 'Guercio Energy Group' },
+        { email: 'Bill@myersindustrialsvc.com', password: 'demo123', name: 'Bill Myers', org: 'Myers Industrial Services' },
+        { email: 'mike@kmp.com', password: 'demo123', name: 'Mike KMP', org: 'KMP' },
+        { email: 'wadey@stableworks.com', password: 'demo123', name: 'Wade Zane', org: 'Stable Works' },
+        { email: 'Ericd@reddoormarketingco.com', password: 'demo123', name: 'Eric Quidort', org: 'Red Door' },
+        { email: 'Nick@fritzstaffing.com', password: 'demo123', name: 'Nick Wagner', org: 'Fritz Staffing' },
+        { email: 'Ryan@byersindustrial.com', password: 'demo123', name: 'Ryan Morris', org: 'Byers' }
+    ],
 
-      // Initialize Firebase
-      if (!firebase.apps.length) {
-        firebase.initializeApp(CONFIG.firebase);
-        Utils.info('Firebase initialized');
-      }
-
-      // Get auth instance
-      this.auth = firebase.auth();
-
-      // Set up auth state observer
-      this.auth.onAuthStateChanged(user => {
-        this.handleAuthStateChanged(user);
-      });
-
-      // Check for stored token
-      const storedUser = this.getStoredUser();
-      if (storedUser) {
-        this.currentUser = storedUser;
-      }
-
-      Utils.info('Auth Service initialized');
-      return true;
-
-    } catch (error) {
-      Utils.error('Failed to initialize Auth Service:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Handle auth state changes
-   */
-  handleAuthStateChanged(user) {
-    if (user) {
-      // User is signed in
-      this.currentUser = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email.split('@')[0],
-        photoURL: user.photoURL,
-        emailVerified: user.emailVerified
-      };
-
-      // Store user data
-      this.storeUser(this.currentUser);
-
-      // Get user organization from Xano
-      this.getUserOrganization();
-
-      Utils.info('User signed in:', this.currentUser.email);
-
-    } else {
-      // User is signed out
-      this.currentUser = null;
-      this.clearStoredUser();
-      Utils.info('User signed out');
-    }
-
-    // Notify listeners
-    this.notifyAuthStateListeners(this.currentUser);
-
-    // Dispatch global event
-    window.dispatchEvent(new CustomEvent('auth-state-changed', {
-      detail: { user: this.currentUser }
-    }));
-  },
-
-  /**
-   * Sign up new user
-   */
-  async signUp(email, password, displayName = null, organization = null) {
-    try {
-      // Create user in Firebase
-      const userCredential = await this.auth.createUserWithEmailAndPassword(email, password);
-      const user = userCredential.user;
-
-      // Update profile if display name provided
-      if (displayName) {
-        await user.updateProfile({ displayName });
-      }
-
-      // Send verification email
-      await user.sendEmailVerification();
-
-      // Create user record in Xano
-      if (organization) {
-        await this.createUserInXano({
-          uid: user.uid,
-          email: user.email,
-          displayName: displayName || user.email.split('@')[0],
-          organization: organization
-        });
-      }
-
-      Utils.info('User created successfully');
-      
-      return {
-        success: true,
-        user: user,
-        message: 'Account created! Please check your email to verify your account.'
-      };
-
-    } catch (error) {
-      Utils.error('Sign up error:', error);
-      return {
-        success: false,
-        error: error.code,
-        message: this.getErrorMessage(error.code)
-      };
-    }
-  },
-
-  /**
-   * Sign in user
-   */
-  async signIn(email, password) {
-    try {
-      const userCredential = await this.auth.signInWithEmailAndPassword(email, password);
-      
-      Utils.info('User signed in successfully');
-      
-      return {
-        success: true,
-        user: userCredential.user
-      };
-
-    } catch (error) {
-      Utils.error('Sign in error:', error);
-      return {
-        success: false,
-        error: error.code,
-        message: this.getErrorMessage(error.code)
-      };
-    }
-  },
-
-  /**
-   * Sign out user
-   */
-  async signOut() {
-    try {
-      await this.auth.signOut();
-      this.clearStoredUser();
-      
-      Utils.info('User signed out');
-      
-      return { success: true };
-
-    } catch (error) {
-      Utils.error('Sign out error:', error);
-      return {
-        success: false,
-        error: error.code,
-        message: 'Failed to sign out'
-      };
-    }
-  },
-
-  /**
-   * Reset password
-   */
-  async resetPassword(email) {
-    try {
-      await this.auth.sendPasswordResetEmail(email);
-      
-      return {
-        success: true,
-        message: 'Password reset email sent! Check your inbox.'
-      };
-
-    } catch (error) {
-      Utils.error('Password reset error:', error);
-      return {
-        success: false,
-        error: error.code,
-        message: this.getErrorMessage(error.code)
-      };
-    }
-  },
-
-  /**
-   * Update user profile
-   */
-  async updateProfile(updates) {
-    try {
-      if (!this.auth.currentUser) {
-        throw new Error('No user signed in');
-      }
-
-      await this.auth.currentUser.updateProfile(updates);
-      
-      // Update local user object
-      if (this.currentUser) {
-        this.currentUser = {
-          ...this.currentUser,
-          ...updates
-        };
-        this.storeUser(this.currentUser);
-      }
-
-      return { success: true };
-
-    } catch (error) {
-      Utils.error('Profile update error:', error);
-      return {
-        success: false,
-        message: 'Failed to update profile'
-      };
-    }
-  },
-
-  /**
-   * Change password
-   */
-  async changePassword(currentPassword, newPassword) {
-    try {
-      if (!this.auth.currentUser) {
-        throw new Error('No user signed in');
-      }
-
-      // Re-authenticate user
-      const credential = firebase.auth.EmailAuthProvider.credential(
-        this.auth.currentUser.email,
-        currentPassword
-      );
-      
-      await this.auth.currentUser.reauthenticateWithCredential(credential);
-
-      // Update password
-      await this.auth.currentUser.updatePassword(newPassword);
-
-      return {
-        success: true,
-        message: 'Password changed successfully'
-      };
-
-    } catch (error) {
-      Utils.error('Password change error:', error);
-      return {
-        success: false,
-        error: error.code,
-        message: this.getErrorMessage(error.code)
-      };
-    }
-  },
-
-  /**
-   * Get current user
-   */
-  getCurrentUser() {
-    return this.currentUser;
-  },
-
-  /**
-   * Check if user is authenticated
-   */
-  isAuthenticated() {
-    return this.currentUser !== null;
-  },
-
-  /**
-   * Get user's ID token
-   */
-  async getIdToken() {
-    if (!this.auth.currentUser) {
-      return null;
-    }
-
-    try {
-      return await this.auth.currentUser.getIdToken();
-    } catch (error) {
-      Utils.error('Failed to get ID token:', error);
-      return null;
-    }
-  },
-
-  /**
-   * Create user record in Xano
-   */
-  async createUserInXano(userData) {
-    try {
-      // This will be implemented with api-service.js
-      // For now, just store locally
-      const users = JSON.parse(localStorage.getItem(CONFIG.storage.prefix + 'users') || '[]');
-      users.push(userData);
-      localStorage.setItem(CONFIG.storage.prefix + 'users', JSON.stringify(users));
-
-      return { success: true };
-
-    } catch (error) {
-      Utils.error('Failed to create user in Xano:', error);
-      return { success: false };
-    }
-  },
-
-  /**
-   * Get user organization from Xano
-   */
-  async getUserOrganization() {
-    try {
-      if (!this.currentUser) return null;
-
-      // This will be implemented with api-service.js
-      // For now, get from localStorage
-      const users = JSON.parse(localStorage.getItem(CONFIG.storage.prefix + 'users') || '[]');
-      const user = users.find(u => u.uid === this.currentUser.uid);
-
-      if (user && user.organization) {
-        this.currentUser.organization = user.organization;
-        this.storeUser(this.currentUser);
-        
-        // Set organization in visibility service
-        if (window.VisibilityService) {
-          VisibilityService.setOrganization(user.organization);
+    /**
+     * Initialize the authentication service
+     */
+    async init() {
+        if (this.isInitialized) {
+            return;
         }
 
-        return user.organization;
-      }
+        console.log('🔐 Initializing Auth Service...');
 
-      // Default to oversight if no organization set
-      return CONFIG.organizations.oversight;
+        // Check if Firebase is properly configured
+        const firebaseConfig = window.CONFIG?.firebase;
+        
+        if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
+            console.warn('⚠️ Firebase not configured. Running in DEMO MODE.');
+            this.demoMode = true;
+            this.isInitialized = true;
+            this.restoreDemoSession();
+            return;
+        }
 
-    } catch (error) {
-      Utils.error('Failed to get user organization:', error);
-      return CONFIG.organizations.oversight;
+        try {
+            // Initialize Firebase
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+                console.log('✅ Firebase initialized');
+            }
+
+            // Set up auth state listener
+            firebase.auth().onAuthStateChanged((user) => {
+                this.currentUser = user;
+                console.log('Auth state changed:', user ? user.email : 'No user');
+            });
+
+            this.isInitialized = true;
+            console.log('✅ Auth Service initialized (Firebase mode)');
+
+        } catch (error) {
+            console.error('❌ Firebase initialization failed, falling back to DEMO MODE:', error);
+            this.demoMode = true;
+            this.isInitialized = true;
+            this.restoreDemoSession();
+        }
+    },
+
+    /**
+     * Check if running in demo mode
+     */
+    isDemoMode() {
+        return this.demoMode;
+    },
+
+    /**
+     * Restore demo session from localStorage
+     */
+    restoreDemoSession() {
+        const savedUser = localStorage.getItem('demoUser');
+        if (savedUser) {
+            this.currentUser = JSON.parse(savedUser);
+            console.log('✅ Restored demo session:', this.currentUser.email);
+        }
+    },
+
+    /**
+     * Save demo session to localStorage
+     */
+    saveDemoSession(user) {
+        localStorage.setItem('demoUser', JSON.stringify(user));
+    },
+
+    /**
+     * Clear demo session
+     */
+    clearDemoSession() {
+        localStorage.removeItem('demoUser');
+    },
+
+    /**
+     * Login with email and password
+     */
+    async login(email, password) {
+        await this.init();
+
+        if (this.demoMode) {
+            return this.demoLogin(email, password);
+        }
+
+        try {
+            const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+            this.currentUser = userCredential.user;
+            console.log('✅ Login successful:', this.currentUser.email);
+            return this.currentUser;
+        } catch (error) {
+            console.error('❌ Login failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Demo mode login (no Firebase required)
+     */
+    demoLogin(email, password) {
+        console.log('🎭 Demo login attempt:', email);
+        
+        const user = this.demoUsers.find(u => 
+            u.email.toLowerCase() === email.toLowerCase() && u.password === password
+        );
+
+        if (!user) {
+            const error = new Error('Invalid credentials');
+            error.code = 'auth/wrong-password';
+            throw error;
+        }
+
+        // Create mock user object
+        this.currentUser = {
+            uid: 'demo-' + Date.now(),
+            email: user.email,
+            displayName: user.name,
+            emailVerified: true,
+            metadata: {
+                creationTime: new Date().toISOString(),
+                lastSignInTime: new Date().toISOString()
+            }
+        };
+
+        // Save to localStorage
+        this.saveDemoSession(this.currentUser);
+
+        console.log('✅ Demo login successful:', this.currentUser.email);
+        return this.currentUser;
+    },
+
+    /**
+     * Login with Google
+     */
+    async loginWithGoogle() {
+        await this.init();
+
+        if (this.demoMode) {
+            // In demo mode, just create a mock Google user
+            this.currentUser = {
+                uid: 'demo-google-' + Date.now(),
+                email: 'demo@triumphatl.com',
+                displayName: 'Demo Google User',
+                emailVerified: true,
+                photoURL: 'https://via.placeholder.com/150',
+                metadata: {
+                    creationTime: new Date().toISOString(),
+                    lastSignInTime: new Date().toISOString()
+                }
+            };
+            this.saveDemoSession(this.currentUser);
+            console.log('✅ Demo Google login successful');
+            return this.currentUser;
+        }
+
+        try {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            const result = await firebase.auth().signInWithPopup(provider);
+            this.currentUser = result.user;
+            console.log('✅ Google login successful:', this.currentUser.email);
+            return this.currentUser;
+        } catch (error) {
+            console.error('❌ Google login failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Register new user
+     */
+    async register(email, password, displayName) {
+        await this.init();
+
+        if (this.demoMode) {
+            // In demo mode, just add to demo users
+            const newUser = {
+                uid: 'demo-' + Date.now(),
+                email: email,
+                displayName: displayName,
+                emailVerified: false,
+                metadata: {
+                    creationTime: new Date().toISOString(),
+                    lastSignInTime: new Date().toISOString()
+                }
+            };
+            this.currentUser = newUser;
+            this.saveDemoSession(this.currentUser);
+            console.log('✅ Demo registration successful:', email);
+            return this.currentUser;
+        }
+
+        try {
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+            
+            // Update profile with display name
+            if (displayName) {
+                await userCredential.user.updateProfile({
+                    displayName: displayName
+                });
+            }
+
+            this.currentUser = userCredential.user;
+            console.log('✅ Registration successful:', this.currentUser.email);
+            return this.currentUser;
+        } catch (error) {
+            console.error('❌ Registration failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Logout
+     */
+    async logout() {
+        if (this.demoMode) {
+            this.currentUser = null;
+            this.clearDemoSession();
+            console.log('✅ Demo logout successful');
+            return;
+        }
+
+        try {
+            await firebase.auth().signOut();
+            this.currentUser = null;
+            console.log('✅ Logout successful');
+        } catch (error) {
+            console.error('❌ Logout failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Reset password
+     */
+    async resetPassword(email) {
+        await this.init();
+
+        if (this.demoMode) {
+            console.log('🎭 Demo password reset for:', email);
+            // In demo mode, just simulate success
+            return Promise.resolve();
+        }
+
+        try {
+            await firebase.auth().sendPasswordResetEmail(email);
+            console.log('✅ Password reset email sent to:', email);
+        } catch (error) {
+            console.error('❌ Password reset failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get current user
+     */
+    async getCurrentUser() {
+        await this.init();
+
+        if (this.demoMode) {
+            return this.currentUser;
+        }
+
+        return new Promise((resolve) => {
+            const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                unsubscribe();
+                this.currentUser = user;
+                resolve(user);
+            });
+        });
+    },
+
+    /**
+     * Update user profile
+     */
+    async updateProfile(updates) {
+        if (this.demoMode) {
+            this.currentUser = { ...this.currentUser, ...updates };
+            this.saveDemoSession(this.currentUser);
+            console.log('✅ Demo profile updated');
+            return;
+        }
+
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                throw new Error('No user logged in');
+            }
+
+            await user.updateProfile(updates);
+            console.log('✅ Profile updated');
+        } catch (error) {
+            console.error('❌ Profile update failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update email
+     */
+    async updateEmail(newEmail) {
+        if (this.demoMode) {
+            this.currentUser.email = newEmail;
+            this.saveDemoSession(this.currentUser);
+            console.log('✅ Demo email updated');
+            return;
+        }
+
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                throw new Error('No user logged in');
+            }
+
+            await user.updateEmail(newEmail);
+            console.log('✅ Email updated');
+        } catch (error) {
+            console.error('❌ Email update failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update password
+     */
+    async updatePassword(newPassword) {
+        if (this.demoMode) {
+            console.log('✅ Demo password updated');
+            return;
+        }
+
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                throw new Error('No user logged in');
+            }
+
+            await user.updatePassword(newPassword);
+            console.log('✅ Password updated');
+        } catch (error) {
+            console.error('❌ Password update failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete user account
+     */
+    async deleteAccount() {
+        if (this.demoMode) {
+            this.currentUser = null;
+            this.clearDemoSession();
+            console.log('✅ Demo account deleted');
+            return;
+        }
+
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                throw new Error('No user logged in');
+            }
+
+            await user.delete();
+            this.currentUser = null;
+            console.log('✅ Account deleted');
+        } catch (error) {
+            console.error('❌ Account deletion failed:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get ID token for API calls
+     */
+    async getIdToken() {
+        if (this.demoMode) {
+            return 'demo-token-' + Date.now();
+        }
+
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                throw new Error('No user logged in');
+            }
+
+            return await user.getIdToken();
+        } catch (error) {
+            console.error('❌ Failed to get ID token:', error);
+            throw error;
+        }
     }
-  },
-
-  /**
-   * Store user in localStorage
-   */
-  storeUser(user) {
-    localStorage.setItem(
-      CONFIG.storage.prefix + CONFIG.storage.keys.currentUser,
-      JSON.stringify(user)
-    );
-  },
-
-  /**
-   * Get stored user from localStorage
-   */
-  getStoredUser() {
-    const stored = localStorage.getItem(
-      CONFIG.storage.prefix + CONFIG.storage.keys.currentUser
-    );
-    return stored ? JSON.parse(stored) : null;
-  },
-
-  /**
-   * Clear stored user
-   */
-  clearStoredUser() {
-    localStorage.removeItem(
-      CONFIG.storage.prefix + CONFIG.storage.keys.currentUser
-    );
-  },
-
-  /**
-   * Add auth state listener
-   */
-  onAuthStateChanged(callback) {
-    this.authStateListeners.push(callback);
-    
-    // Call immediately with current state
-    callback(this.currentUser);
-    
-    // Return unsubscribe function
-    return () => {
-      const index = this.authStateListeners.indexOf(callback);
-      if (index > -1) {
-        this.authStateListeners.splice(index, 1);
-      }
-    };
-  },
-
-  /**
-   * Notify all auth state listeners
-   */
-  notifyAuthStateListeners(user) {
-    this.authStateListeners.forEach(callback => {
-      try {
-        callback(user);
-      } catch (error) {
-        Utils.error('Auth state listener error:', error);
-      }
-    });
-  },
-
-  /**
-   * Get user-friendly error message
-   */
-  getErrorMessage(errorCode) {
-    const errorMessages = {
-      'auth/email-already-in-use': 'This email is already registered.',
-      'auth/invalid-email': 'Invalid email address.',
-      'auth/operation-not-allowed': 'Operation not allowed.',
-      'auth/weak-password': 'Password is too weak. Use at least 8 characters.',
-      'auth/user-disabled': 'This account has been disabled.',
-      'auth/user-not-found': 'No account found with this email.',
-      'auth/wrong-password': 'Incorrect password.',
-      'auth/too-many-requests': 'Too many attempts. Please try again later.',
-      'auth/network-request-failed': 'Network error. Please check your connection.',
-      'auth/requires-recent-login': 'Please sign in again to continue.'
-    };
-
-    return errorMessages[errorCode] || 'An error occurred. Please try again.';
-  }
 };
 
-// Make available globally
+// Export to window
 window.AuthService = AuthService;
-
-// Log initialization
-if (CONFIG.dev.debugMode) {
-  console.log('🔐 Auth Service loaded');
-}
