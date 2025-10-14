@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Triumph Intelligence - Multi-organization customer relationship management system">
+    <meta name="description" content="Triumph Intelligence - Multi-organization business intelligence system">
     <meta name="author" content="Triumph Atlantic">
     <title>Triumph Intelligence</title>
     
@@ -64,6 +64,14 @@
             max-height: 600px;
         }
         
+        /* Company name in header */
+        .header-company {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--text-secondary);
+            margin-left: var(--spacing-sm);
+        }
+        
         /* Responsive adjustments */
         @media (max-width: 1400px) {
             .page {
@@ -106,7 +114,10 @@
     <div class="app-container">
         <!-- Header -->
         <header class="header">
-            <h1 class="header-brand">CRM Portal</h1>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <h1 class="header-brand">Triumph Intelligence</h1>
+                <span class="header-company" id="header-company-name"></span>
+            </div>
             
             <div class="header-controls">
                 <!-- Access Level Badge -->
