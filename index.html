@@ -19,6 +19,88 @@
     <link rel="stylesheet" href="assets/css/main.css">
     <link rel="stylesheet" href="assets/css/components.css">
     <link rel="stylesheet" href="assets/css/themes.css">
+    
+    <style>
+        /* Layout fixes for proper screen fitting */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding-top: var(--header-height);
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: transparent;
+            width: calc(100vw - var(--sidebar-width));
+            max-width: 100%;
+        }
+        
+        .page {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: var(--spacing-xl);
+        }
+        
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .table-container,
+        .card {
+            max-width: 100%;
+            overflow: hidden;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 1400px) {
+            .page {
+                padding: var(--spacing-lg);
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .card-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+                width: 100vw;
+            }
+            
+            .page {
+                padding: var(--spacing-md);
+            }
+            
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .page-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .page-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -27,6 +109,11 @@
             <h1 class="header-brand">CRM Portal</h1>
             
             <div class="header-controls">
+                <!-- Access Level Badge -->
+                <div id="access-badge" class="badge badge-success" style="display: none; margin-right: 16px;">
+                    ✓ Full Access
+                </div>
+                
                 <!-- Theme Toggle -->
                 <div class="theme-switcher">
                     <span class="theme-icon">☀️</span>
