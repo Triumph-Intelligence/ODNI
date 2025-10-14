@@ -91,9 +91,9 @@ const App = {
                 console.warn('⚠️ DataService not found');
             }
 
-            // Initialize VisibilityService
+            // Initialize VisibilityService with default org
             if (window.VisibilityService && VisibilityService.init) {
-                await VisibilityService.init();
+                VisibilityService.init('Triumph Atlantic');
                 console.log('✅ VisibilityService initialized');
             }
 
