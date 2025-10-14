@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CRM Portal - Login">
-    <title>Login - CRM Portal</title>
+    <meta name="description" content="Triumph Intelligence - Login">
+    <title>Login - Triumph Intelligence</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>">
@@ -52,10 +52,12 @@
             border-radius: var(--radius-2xl);
             padding: var(--spacing-3xl);
             box-shadow: var(--shadow-2xl);
-            max-width: 450px;
+            max-width: 500px;
             width: 100%;
             position: relative;
             z-index: 1;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .login-header {
@@ -286,6 +288,8 @@
             padding: var(--spacing-md);
             margin-bottom: var(--spacing-lg);
             font-size: var(--text-sm);
+            max-height: 400px;
+            overflow-y: auto;
         }
 
         .demo-credentials strong {
@@ -317,18 +321,232 @@
         <div class="login-card">
             <div class="login-header">
                 <div class="login-logo">🏢</div>
-                <h1 class="login-title">CRM Portal</h1>
+                <h1 class="login-title">Triumph Intelligence</h1>
                 <p class="login-subtitle">Sign in to your account</p>
             </div>
 
             <!-- Alert Messages -->
             <div id="alert-message" class="alert alert-error hidden"></div>
 
-            <!-- Demo Credentials (remove in production) -->
+            <!-- Demo Credentials - 10 Approved Users -->
             <div class="demo-credentials">
-                <strong>🎭 Demo Access</strong>
-                <p>Email: <code>demo@triumphatl.com</code></p>
-                <p>Password: <code>demo123</code></p>
+                <strong style="font-size: 14px; color: var(--primary-color);">🎭 10 Approved Demo Users</strong>
+                <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 12px; line-height: 1.5;">
+                    All passwords are <code>demo123</code> except Rob's which is <code>admin123</code>.
+                </p>
+                
+                <!-- Triumph Atlantic Users (Full Access) -->
+                <div style="margin-bottom: 12px;">
+                    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%); border-left: 3px solid var(--success-color); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 18px;">✓</span>
+                            <strong style="color: var(--success-color); font-size: 13px;">FULL ACCESS - TRIUMPH ATLANTIC</strong>
+                        </div>
+                        <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 8px;">
+                            Sees ALL companies, locations, contacts, and complete contractor matrix
+                        </div>
+                        
+                        <!-- User 1: Demo -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Demo User</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">demo@triumphatlantic.com</code>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 2: Ryan Morris -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Ryan Morris</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Ryan@triumphatlantic.com</code>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 3: Rob Sebia (Admin) -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">
+                                        Rob Sebia 
+                                        <span style="background: var(--primary-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 8px; margin-left: 4px;">ADMIN</span>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Rob@triumphatlantic.com</code>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(239, 68, 68, 0.1); color: var(--error-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">admin123</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contractor Users (Siloed Access) -->
+                <div>
+                    <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border-left: 3px solid var(--warning-color); padding: 12px; border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 18px;">⊗</span>
+                            <strong style="color: var(--warning-color); font-size: 13px;">SILOED ACCESS - CONTRACTORS</strong>
+                        </div>
+                        <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 8px;">
+                            Only sees companies where they're assigned as contractor
+                        </div>
+                        
+                        <!-- User 4: Gianfranco Guercio -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Gianfranco Guercio</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Gianfranco@guerciogroup.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        🔌 Guercio Energy Group - Electrical
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 5: Bill Myers -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Bill Myers</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Bill@myersindustrialsvc.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        🔧 Myers Industrial - Mechanical
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 6: Mike KMP -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Mike KMP</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">mike@kmp.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        🏗️ KMP - Interior GC
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 7: Eric Quidort -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Eric Quidort</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Ericd@reddoormarketingco.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        📢 Red Door - Marketing
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 8: Nick Wagner -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Nick Wagner</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Nick@fritzstaffing.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        👥 Fritz Staffing
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 9: Wade Zane -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Wade Zane</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">wadey@stableworks.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        🏢 Stable Works
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- User 10: Ryan Morris (Byers) -->
+                        <div style="background: white; padding: 8px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 700; font-size: 12px; color: var(--text-primary);">Ryan Morris</div>
+                                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
+                                        <code style="background: rgba(99, 102, 241, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 9px;">Ryan@byersindustrial.com</code>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--warning-color); font-weight: 600; margin-top: 4px;">
+                                        🏭 Byers Industrial
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <code style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color); padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">demo123</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Access Summary -->
+                <div style="margin-top: 16px; padding: 12px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.2);">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--primary-color); margin-bottom: 8px;">📊 Access Expectations:</div>
+                    <div style="font-size: 10px; line-height: 1.6; color: var(--text-secondary);">
+                        <div style="margin-bottom: 6px;">
+                            <strong style="color: var(--success-color);">✓ Full Access:</strong> 10 companies • 33 locations • 24 contacts • All data
+                        </div>
+                        <div>
+                            <strong style="color: var(--warning-color);">⊗ Siloed:</strong> Only assigned companies • Limited locations/contacts
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Login Form -->
@@ -384,7 +602,7 @@
 
             <!-- Signup Prompt -->
             <div class="signup-prompt">
-                Don't have an account? <a href="#" id="signup-link">Sign up</a>
+                Don't have an account? <a href="#" id="signup-link">Contact Admin</a>
             </div>
         </div>
     </div>
@@ -422,11 +640,11 @@
                     this.handleForgotPassword();
                 });
 
-                // Signup link (for future implementation)
+                // Signup link
                 const signupLink = document.getElementById('signup-link');
                 signupLink.addEventListener('click', (e) => {
                     e.preventDefault();
-                    this.showAlert('Signup feature coming soon! For now, please contact your administrator.', 'success');
+                    this.showAlert('Please contact your administrator for account access.', 'info');
                 });
             },
 
