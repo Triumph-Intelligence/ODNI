@@ -36,6 +36,10 @@ const App = {
             // Initialize theme from localStorage
             this.initTheme();
 
+            // ⭐ CRITICAL: Initialize services first!
+            console.log('🔧 Initializing services...');
+            await this.initServices();
+
             // Initialize Firebase Auth
             await AuthService.init();
 
@@ -49,9 +53,6 @@ const App = {
                 // Get user's organization
                 const userOrg = await this.getUserOrganization(user);
                 this.state.currentOrg = userOrg;
-                
-                // Load initial data
-                await this.loadData();
                 
                 // Initialize UI
                 this.initUI();
@@ -76,6 +77,29 @@ const App = {
             this.showError('Failed to initialize application. Please refresh the page.');
         } finally {
             this.hideLoading();
+        }
+    },
+
+    // ⭐ NEW: Initialize all services
+    async initServices() {
+        try {
+            // Initialize DataService (this loads all the data)
+            if (window.DataService) {
+                await DataService.init();
+                console.log('✅ DataService initialized');
+            } else {
+                console.warn('⚠️ DataService not found');
+            }
+
+            // Initialize VisibilityService
+            if (window.VisibilityService && VisibilityService.init) {
+                await VisibilityService.init();
+                console.log('✅ VisibilityService initialized');
+            }
+
+        } catch (error) {
+            console.error('❌ Error initializing services:', error);
+            throw error;
         }
     },
 
@@ -132,68 +156,6 @@ const App = {
         return 'Triumph Atlantic';
     },
 
-    // Load data from API or mock data
-    async loadData() {
-        console.log('📊 Loading data...');
-        
-        try {
-            // Try to load from Xano API first
-            const [companies, locations, contacts, gifts, referrals, opportunities, projects, changeLog] = await Promise.all([
-                DataService.getCompanies().catch(() => []),
-                DataService.getLocations().catch(() => []),
-                DataService.getContacts().catch(() => []),
-                DataService.getGifts().catch(() => []),
-                DataService.getReferrals().catch(() => []),
-                DataService.getOpportunities().catch(() => []),
-                DataService.getProjects().catch(() => []),
-                DataService.getChangeLog().catch(() => [])
-            ]);
-
-            // If we got real data from API, use it
-            if (companies.length > 0) {
-                console.log('✅ Loaded data from API');
-                this.state.data = {
-                    companies,
-                    locations,
-                    contacts,
-                    gifts,
-                    referrals,
-                    opportunities,
-                    projects,
-                    changeLog
-                };
-            } else {
-                // Fall back to mock data for demo
-                console.log('⚠️ Using mock data for demo');
-                this.state.data = {
-                    companies: MockData.companies,
-                    locations: MockData.locations,
-                    contacts: MockData.contacts,
-                    gifts: MockData.gifts,
-                    referrals: MockData.referrals,
-                    opportunities: MockData.opportunities,
-                    projects: MockData.projects,
-                    changeLog: MockData.changeLog
-                };
-            }
-
-            console.log('✅ Data loaded successfully');
-        } catch (error) {
-            console.error('❌ Error loading data:', error);
-            // Use mock data as fallback
-            this.state.data = {
-                companies: MockData.companies || [],
-                locations: MockData.locations || [],
-                contacts: MockData.contacts || [],
-                gifts: MockData.gifts || [],
-                referrals: MockData.referrals || [],
-                opportunities: MockData.opportunities || [],
-                projects: MockData.projects || [],
-                changeLog: MockData.changeLog || []
-            };
-        }
-    },
-
     // Initialize UI components
     initUI() {
         console.log('🎨 Initializing UI...');
@@ -241,14 +203,14 @@ const App = {
 
     // Show/hide org switcher based on access level
     updateOrgSwitcherVisibility() {
-        const orgSwitcherContainer = document.getElementById('org-switcher-container');
-        if (!orgSwitcherContainer) return;
+        const orgSwitcher = document.querySelector('.org-switcher');
+        if (!orgSwitcher) return;
 
         // Only show org switcher for Triumph Atlantic users
         if (this.state.currentOrg === 'Triumph Atlantic') {
-            orgSwitcherContainer.style.display = 'flex';
+            orgSwitcher.style.display = 'flex';
         } else {
-            orgSwitcherContainer.style.display = 'none';
+            orgSwitcher.style.display = 'none';
         }
     },
 
@@ -397,151 +359,82 @@ const App = {
 
     // Load component for specific page
     async loadPageComponent(pageName) {
-        const component = this.state.components[pageName];
+        // Check if component class exists
+        const componentClassName = this.capitalize(pageName) + 'Component';
+        const ComponentClass = window[componentClassName];
         
-        if (!component) {
-            console.warn(`No component registered for page: ${pageName}`);
-            return;
-        }
-
-        // If component is already loaded, just refresh it
-        if (component.loaded && component.instance && component.instance.render) {
-            component.instance.render(this.getFilteredData());
-            return;
-        }
-
-        // Load component dynamically
-        try {
-            // Check if component exists in window object
-            const ComponentClass = window[this.capitalize(pageName) + 'Component'];
-            
-            if (ComponentClass) {
-                component.instance = new ComponentClass();
-                component.loaded = true;
-                component.instance.render(this.getFilteredData());
-            } else {
-                // Render using built-in methods
-                this.renderPage(pageName);
-            }
-        } catch (error) {
-            console.error(`Error loading component for ${pageName}:`, error);
-            this.renderPage(pageName);
+        if (ComponentClass && ComponentClass.init) {
+            console.log(`🎯 Initializing ${componentClassName}...`);
+            await ComponentClass.init();
+        } else {
+            console.log(`⚠️ No component found for ${pageName}`);
         }
     },
 
     // Get filtered data based on current organization
     getFilteredData() {
         const org = this.state.currentOrg;
-        const data = this.state.data;
+        
+        // Get data from DataService cache
+        const companies = DataService.cache.companies || [];
+        const locations = DataService.cache.locations || [];
+        const contacts = DataService.cache.contacts || [];
+        const gifts = DataService.cache.gifts || [];
+        const referrals = DataService.cache.referrals || [];
+        const opportunities = DataService.cache.opportunities || [];
+        const projects = DataService.cache.projects || [];
+        const changeLog = DataService.cache.changeLog || [];
 
         // If Triumph Atlantic, return all data
         if (org === 'Triumph Atlantic') {
-            return data;
+            return {
+                companies,
+                locations,
+                contacts,
+                gifts,
+                referrals,
+                opportunities,
+                projects,
+                changeLog
+            };
         }
 
         // Filter data based on visibility service
         return {
-            companies: data.companies.filter(c => 
+            companies: companies.filter(c => 
                 VisibilityService.isCompanyVisible(c, org)
             ),
-            locations: data.locations.filter(l => {
-                const company = data.companies.find(c => c.normalized === l.company);
+            locations: locations.filter(l => {
+                const company = companies.find(c => c.normalized === l.company);
                 return company && VisibilityService.isCompanyVisible(company, org);
             }),
-            contacts: data.contacts.filter(c => {
-                const company = data.companies.find(co => co.normalized === c.company);
+            contacts: contacts.filter(c => {
+                const company = companies.find(co => co.normalized === c.company);
                 return company && VisibilityService.isCompanyVisible(company, org);
             }),
-            gifts: data.gifts.filter(g => {
-                const contact = data.contacts.find(c => c.email === g.contact_email);
+            gifts: gifts.filter(g => {
+                const contact = contacts.find(c => c.email === g.contact_email);
                 if (!contact) return false;
-                const company = data.companies.find(co => co.normalized === contact.company);
+                const company = companies.find(co => co.normalized === contact.company);
                 return company && VisibilityService.isCompanyVisible(company, org);
             }),
-            referrals: data.referrals.filter(r => {
-                const contact = data.contacts.find(c => c.email === r.referrer_email);
+            referrals: referrals.filter(r => {
+                const contact = contacts.find(c => c.email === r.referrer_email);
                 if (!contact) return false;
-                const company = data.companies.find(co => co.normalized === contact.company);
+                const company = companies.find(co => co.normalized === contact.company);
                 return company && VisibilityService.isCompanyVisible(company, org);
             }),
-            opportunities: data.opportunities.filter(o => {
-                const company = data.companies.find(c => c.name === o.company);
+            opportunities: opportunities.filter(o => {
+                const company = companies.find(c => c.name === o.company);
                 return company && VisibilityService.isCompanyVisible(company, org);
             }),
-            projects: data.projects.filter(p => {
-                const company = data.companies.find(c => c.name === p.company);
+            projects: projects.filter(p => {
+                const company = companies.find(c => c.name === p.company);
                 return company && VisibilityService.isCompanyVisible(company, org);
             }),
-            changeLog: org === 'Triumph Atlantic' ? data.changeLog : 
-                       data.changeLog.filter(log => log.org === org)
+            changeLog: org === 'Triumph Atlantic' ? changeLog : 
+                       changeLog.filter(log => log.org === org)
         };
-    },
-
-    // Render page content
-    renderPage(pageName) {
-        const data = this.getFilteredData();
-        
-        switch(pageName) {
-            case 'dashboard':
-                this.renderDashboard(data);
-                break;
-            case 'intelligence':
-                this.renderIntelligence(data);
-                break;
-            case 'companies':
-                this.renderCompanies(data);
-                break;
-            case 'contacts':
-                this.renderContacts(data);
-                break;
-            case 'referrals':
-                this.renderReferrals(data);
-                break;
-            case 'opportunities':
-                this.renderOpportunities(data);
-                break;
-            case 'projects':
-                this.renderProjects(data);
-                break;
-            default:
-                console.warn(`No render method for page: ${pageName}`);
-        }
-    },
-
-    // Render methods (to be implemented in separate component files)
-    renderDashboard(data) {
-        console.log('Rendering dashboard...', data);
-        // This will be handled by DashboardComponent when we create it
-    },
-
-    renderIntelligence(data) {
-        console.log('Rendering intelligence...', data);
-        // This will be handled by IntelligenceComponent
-    },
-
-    renderCompanies(data) {
-        console.log('Rendering companies...', data);
-        // This will be handled by CompaniesComponent
-    },
-
-    renderContacts(data) {
-        console.log('Rendering contacts...', data);
-        // This will be handled by ContactsComponent
-    },
-
-    renderReferrals(data) {
-        console.log('Rendering referrals...', data);
-        // This will be handled by ReferralsComponent
-    },
-
-    renderOpportunities(data) {
-        console.log('Rendering opportunities...', data);
-        // This will be handled by OpportunitiesComponent
-    },
-
-    renderProjects(data) {
-        console.log('Rendering projects...', data);
-        // This will be handled by ProjectsComponent
     },
 
     // Switch organization
@@ -557,6 +450,12 @@ const App = {
         }
 
         console.log(`🔄 Switching to organization: ${org}`);
+        
+        // Update visibility service
+        if (window.VisibilityService) {
+            VisibilityService.setCurrentOrg(org);
+        }
+        
         this.state.currentOrg = org;
         
         // Update page title
