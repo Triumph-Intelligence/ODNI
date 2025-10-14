@@ -1,1 +1,55 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
 
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Firebase config (keep template, ignore actual keys)
+firebase-config.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+dist/
+build/
+.cache/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*~
+.temp/
+
+# Local database
+*.db
+*.sqlite
+
+# Secrets
+secrets.js
+api-keys.js
