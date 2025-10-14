@@ -1,67 +1,185 @@
-<!-- Dashboard Page -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CRM Portal - Multi-organization customer relationship management system">
+    <meta name="author" content="Triumph Atlantic">
+    <title>CRM Portal</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/components.css">
+    <link rel="stylesheet" href="assets/css/themes.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="header-brand">CRM Portal</h1>
+            
+            <div class="header-controls">
+                <!-- Theme Toggle -->
+                <div class="theme-switcher">
+                    <span class="theme-icon">☀️</span>
+                    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme"></button>
+                    <span class="theme-icon">🌙</span>
+                </div>
+                
+                <!-- Organization Switcher -->
+                <div class="org-switcher">
+                    <label for="org-select">Organization:</label>
+                    <select id="org-select">
+                        <option value="Triumph Atlantic">Triumph Atlantic</option>
+                        <option value="Guercio Energy Group">Guercio Energy Group</option>
+                        <option value="Myers Industrial Services">Myers Industrial Services</option>
+                        <option value="KMP">KMP</option>
+                        <option value="Stable Works">Stable Works</option>
+                        <option value="Red Door">Red Door</option>
+                        <option value="Fritz Staffing">Fritz Staffing</option>
+                        <option value="Byers">Byers</option>
+                    </select>
+                </div>
+                
+                <!-- User Menu -->
+                <div class="user-menu">
+                    <button id="logout-btn" class="btn btn-ghost btn-sm">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="nav-menu">
+                <div class="nav-section">
+                    <button class="nav-item active" data-page="dashboard">
+                        Dashboard
+                    </button>
+                    <button class="nav-item" data-page="intelligence">
+                        Office of National Intelligence
+                    </button>
+                </div>
+                
+                <div class="nav-section">
+                    <h3 class="nav-section-title">CRM</h3>
+                    <button class="nav-item" data-page="companies">
+                        Companies
+                    </button>
+                    <button class="nav-item" data-page="contacts">
+                        Contacts & Gifts
+                    </button>
+                    <button class="nav-item" data-page="referrals">
+                        Referrals
+                    </button>
+                </div>
+                
+                <div class="nav-section">
+                    <h3 class="nav-section-title">Sales</h3>
+                    <button class="nav-item" data-page="opportunities">
+                        Opportunities
+                    </button>
+                    <button class="nav-item" data-page="projects">
+                        Projects
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
             <div id="dashboard" class="page active">
                 <div class="page-header">
                     <h2 class="page-title">Dashboard</h2>
-                </div>
-
-                <div class="card">
-                    <h3 class="card-title">Import Past Clients (CSV)</h3>
-                    <p style="margin-bottom: 16px; color: var(--text-secondary);">Upload a CSV file to import your existing client data into the CRM.</p>
-                    <button class="btn btn-primary" onclick="openImportModal()">Import CSV File</button>
+                    <p class="page-subtitle">Overview of your key metrics and recent activity</p>
                 </div>
 
                 <div class="card-grid">
-                    <div class="card kpi-card clickable" onclick="showOverdueContacts()">
-                        <div class="kpi-value" id="overdue-touches">3</div>
+                    <div class="card kpi-card clickable" data-page="contacts">
+                        <div class="kpi-value" id="kpi-overdue-touches">—</div>
                         <div class="kpi-label">Overdue Touches</div>
                     </div>
-                    <div class="card kpi-card clickable" onclick="showGiftReport()">
-                        <div class="kpi-value" id="last-gift">12</div>
+                    <div class="card kpi-card">
+                        <div class="kpi-value" id="kpi-last-gift">—</div>
                         <div class="kpi-label">Days Since Last Gift</div>
                     </div>
-                    <div class="card kpi-card clickable" onclick="showReferralReport()">
-                        <div class="kpi-value" id="referrals-asked">5</div>
+                    <div class="card kpi-card">
+                        <div class="kpi-value" id="kpi-referrals">—</div>
                         <div class="kpi-label">Referrals Asked (30d)</div>
                     </div>
-                    <div class="card kpi-card clickable" onclick="showOpportunityReport()">
-                        <div class="kpi-value" id="open-opps">$125K</div>
+                    <div class="card kpi-card">
+                        <div class="kpi-value" id="kpi-open-opps">—</div>
                         <div class="kpi-label">Open Opps (Weighted)</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Recent Activity</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-activity-body">
+                                <tr>
+                                    <td colspan="3" class="table-empty">Loading activity...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Office of National Intelligence Page -->
+            <!-- Intelligence Page -->
             <div id="intelligence" class="page">
                 <div class="page-header">
                     <h2 class="page-title">Office of National Intelligence</h2>
-                    <p style="color: var(--text-secondary); margin-top: 8px;">Comprehensive intelligence on companies, contacts, and business relationships</p>
+                    <p class="page-subtitle">Comprehensive intelligence on companies, contacts, and business relationships</p>
                 </div>
 
                 <div class="card">
-                    <h3 class="card-title">Intelligence Summary</h3>
+                    <div class="card-header">
+                        <h3 class="card-title">Intelligence Summary</h3>
+                    </div>
                     <div class="card-grid">
-                        <div style="padding: 16px; background: var(--background); border-radius: var(--radius); border: 1px solid var(--border);">
-                            <div style="font-size: 32px; font-weight: 700; color: var(--primary-color);" id="intel-companies">0</div>
-                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">Companies Tracked</div>
+                        <div class="card kpi-card">
+                            <div class="kpi-value" id="intel-companies">—</div>
+                            <div class="kpi-label">Companies Tracked</div>
                         </div>
-                        <div style="padding: 16px; background: var(--background); border-radius: var(--radius); border: 1px solid var(--border);">
-                            <div style="font-size: 32px; font-weight: 700; color: var(--primary-color);" id="intel-locations">0</div>
-                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">Total Locations</div>
+                        <div class="card kpi-card">
+                            <div class="kpi-value" id="intel-locations">—</div>
+                            <div class="kpi-label">Total Locations</div>
                         </div>
-                        <div style="padding: 16px; background: var(--background); border-radius: var(--radius); border: 1px solid var(--border);">
-                            <div style="font-size: 32px; font-weight: 700; color: var(--primary-color);" id="intel-contacts">0</div>
-                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">Total Contacts</div>
+                        <div class="card kpi-card">
+                            <div class="kpi-value" id="intel-contacts">—</div>
+                            <div class="kpi-label">Total Contacts</div>
                         </div>
-                        <div style="padding: 16px; background: var(--background); border-radius: var(--radius); border: 1px solid var(--border);">
-                            <div style="font-size: 32px; font-weight: 700; color: var(--warning-color);" id="intel-unserved">0</div>
-                            <div style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">Unserved Locations</div>
+                        <div class="card kpi-card">
+                            <div class="kpi-value" id="intel-unserved">—</div>
+                            <div class="kpi-label">Unserved Locations</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <h3 class="card-title">Contractor Intelligence Matrix</h3>
-                    <p style="margin-bottom: 16px; color: var(--text-secondary);">Who serves which companies across all service lines</p>
+                    <div class="card-header">
+                        <h3 class="card-title">Contractor Intelligence Matrix</h3>
+                        <p class="card-subtitle">Who serves which companies across all service lines</p>
+                    </div>
                     <div class="table-wrapper">
                         <table class="table">
                             <thead>
@@ -72,25 +190,21 @@
                                     <th>Interior GC</th>
                                     <th>Marketing</th>
                                     <th>Staffing</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="intel-matrix-body"></tbody>
+                            <tbody id="intel-matrix-body">
+                                <tr>
+                                    <td colspan="6" class="table-empty">Loading matrix...</td>
+                                </tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
 
                 <div class="card">
-                    <h3 class="card-title">Location Intelligence</h3>
-                    <p style="margin-bottom: 16px; color: var(--text-secondary);">All company locations with contact coverage status</p>
-                    <div class="table-filters" style="margin-bottom: 16px;">
-                        <input type="text" class="search-input" placeholder="Search locations..." id="intel-location-search" oninput="updateIntelligenceReport()">
-                        <select class="form-select" id="intel-status-filter" onchange="updateIntelligenceReport()">
-                            <option value="">All Statuses</option>
-                            <option value="Covered">Covered</option>
-                            <option value="Needs Intro">Needs Intro</option>
-                            <option value="Unserved">Unserved</option>
-                        </select>
+                    <div class="card-header">
+                        <h3 class="card-title">Location Intelligence</h3>
+                        <p class="card-subtitle">All company locations with contact coverage status</p>
                     </div>
                     <div class="table-wrapper">
                         <table class="table">
@@ -104,26 +218,237 @@
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody id="intel-locations-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3 class="card-title">Recent Changes & Activity Log</h3>
-                    <p style="margin-bottom: 16px; color: var(--text-secondary);">Track all modifications and user actions</p>
-                    <div class="table-wrapper" style="max-height: 400px;">
-                        <table class="table">
-                            <thead>
+                            <tbody id="intel-locations-body">
                                 <tr>
-                                    <th>Timestamp</th>
-                                    <th>User</th>
-                                    <th>Action</th>
-                                    <th>Details</th>
+                                    <td colspan="6" class="table-empty">Loading locations...</td>
                                 </tr>
-                            </thead>
-                            <tbody id="change-log-body"></tbody>
+                            </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
+            <!-- Companies Page -->
+            <div id="companies" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Companies</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="add-company-btn">+ Add Company</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <input type="text" class="search-input" placeholder="Search companies..." id="companies-search">
+                        <div class="table-filters">
+                            <select class="form-select" id="tier-filter">
+                                <option value="">All Tiers</option>
+                                <option value="Enterprise">Enterprise</option>
+                                <option value="Large">Large</option>
+                                <option value="Mid">Mid</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable">Company Name</th>
+                                    <th class="sortable">Tier</th>
+                                    <th class="sortable">Status</th>
+                                    <th>HQ State</th>
+                                    <th>Locations</th>
+                                    <th>Contacts</th>
+                                </tr>
+                            </thead>
+                            <tbody id="companies-table-body">
+                                <tr>
+                                    <td colspan="6" class="table-empty">Loading companies...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contacts Page -->
+            <div id="contacts" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Contacts & Gifts</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="add-contact-btn">+ Add Contact</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <input type="text" class="search-input" placeholder="Search contacts..." id="contacts-search">
+                        <div class="table-filters">
+                            <button class="btn btn-sm" id="show-overdue-btn">Show Overdue Only</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable">Name</th>
+                                    <th>Title</th>
+                                    <th class="sortable">Company</th>
+                                    <th>Location</th>
+                                    <th>Channel</th>
+                                    <th class="sortable">Last Contacted</th>
+                                    <th class="sortable">Next Touch Due</th>
+                                    <th>Last Gift</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contacts-table-body">
+                                <tr>
+                                    <td colspan="8" class="table-empty">Loading contacts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Referrals Page -->
+            <div id="referrals" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Referrals</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="add-referral-btn">+ Add Referral</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Active Referrals</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Referred Person</th>
+                                    <th>Company</th>
+                                    <th>Referred By</th>
+                                    <th class="sortable">Follow-up Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="referrals-table-body">
+                                <tr>
+                                    <td colspan="5" class="table-empty">Loading referrals...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Opportunities Page -->
+            <div id="opportunities" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Opportunities</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="add-opportunity-btn">+ Add Opportunity</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Active Opportunities</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Location</th>
+                                    <th>Job Description</th>
+                                    <th>Contact</th>
+                                    <th class="sortable">Start Date</th>
+                                    <th class="sortable">Valuation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="opportunities-table-body">
+                                <tr>
+                                    <td colspan="6" class="table-empty">Loading opportunities...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projects Page -->
+            <div id="projects" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Projects</h2>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="add-project-btn">+ Add Project</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Active Projects</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Location</th>
+                                    <th>Job Description</th>
+                                    <th>Contact</th>
+                                    <th class="sortable">Start Date</th>
+                                    <th class="sortable">End Date</th>
+                                    <th class="sortable">Valuation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="projects-table-body">
+                                <tr>
+                                    <td colspan="7" class="table-empty">Loading projects...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- JavaScript Files (in order) -->
+    <!-- 1. Configuration -->
+    <script src="assets/js/config.js"></script>
+    
+    <!-- 2. Utilities -->
+    <script src="assets/js/utils.js"></script>
+    
+    <!-- 3. Mock Data -->
+    <script src="assets/js/mock-data.js"></script>
+    
+    <!-- 4. Services -->
+    <script src="services/auth-service.js"></script>
+    <script src="services/api-service.js"></script>
+    <script src="services/visibility-service.js"></script>
+    <script src="services/data-service.js"></script>
+    
+    <!-- 5. Components (will be created next) -->
+    <script src="components/shared/header.js"></script>
+    <script src="components/shared/sidebar.js"></script>
+    <script src="components/dashboard/dashboard.js"></script>
+    <script src="components/intelligence/intelligence.js"></script>
+    <script src="components/companies/companies.js"></script>
+    <script src="components/contacts/contacts.js"></script>
+    <script src="components/referrals/referrals.js"></script>
+    <script src="components/opportunities/opportunities.js"></script>
+    <script src="components/projects/projects.js"></script>
+    
+    <!-- 6. Main App -->
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
