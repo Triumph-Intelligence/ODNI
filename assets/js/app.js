@@ -94,25 +94,41 @@ const App = {
         // Fallback: determine org from email domain
         const email = user.email.toLowerCase();
         
-        if (email.includes('triumph') || email.includes('triumphatl')) {
+        // Triumph Atlantic
+        if (email.includes('triumphatlantic') || email.includes('triumphatl')) {
             return 'Triumph Atlantic';
-        } else if (email.includes('guercio')) {
+        }
+        // Guercio Energy Group
+        else if (email.includes('guercio')) {
             return 'Guercio Energy Group';
-        } else if (email.includes('myers')) {
+        }
+        // Myers Industrial Services
+        else if (email.includes('myers')) {
             return 'Myers Industrial Services';
-        } else if (email.includes('kmp')) {
+        }
+        // KMP
+        else if (email.includes('kmp')) {
             return 'KMP';
-        } else if (email.includes('stable')) {
+        }
+        // Stable Works
+        else if (email.includes('stable')) {
             return 'Stable Works';
-        } else if (email.includes('reddoor')) {
+        }
+        // Red Door
+        else if (email.includes('reddoor')) {
             return 'Red Door';
-        } else if (email.includes('fritz')) {
+        }
+        // Fritz Staffing
+        else if (email.includes('fritz')) {
             return 'Fritz Staffing';
-        } else if (email.includes('byers')) {
+        }
+        // Byers
+        else if (email.includes('byers')) {
             return 'Byers';
         }
         
-        // Default to Triumph Atlantic for admin/oversight
+        // Default to Triumph Atlantic for unknown emails
+        console.warn('Unknown email domain, defaulting to Triumph Atlantic');
         return 'Triumph Atlantic';
     },
 
@@ -530,10 +546,32 @@ const App = {
 
     // Switch organization
     switchOrganization(org) {
+        // Only allow Triumph Atlantic to switch organizations
+        const userOrg = this.state.currentOrg;
+        const isTriumphUser = userOrg === 'Triumph Atlantic';
+        
+        if (!isTriumphUser) {
+            console.warn('⚠️ Siloed users cannot switch organizations');
+            this.showToast('You do not have permission to switch organizations', 'error');
+            return;
+        }
+
         console.log(`🔄 Switching to organization: ${org}`);
         this.state.currentOrg = org;
+        
+        // Update page title
+        this.updatePageTitle();
+        
+        // Update header company name
+        this.updateHeaderCompanyName();
+        
+        // Update access badge
         this.updateAccessBadge(org);
+        
+        // Apply org theme
         this.applyOrgTheme(org);
+        
+        // Refresh current page
         this.refreshCurrentPage();
         
         const accessType = org === 'Triumph Atlantic' ? 'Full Access' : 'Siloed Access';
