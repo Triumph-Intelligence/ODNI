@@ -519,34 +519,35 @@
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- JavaScript Files (in order) -->
-    <!-- 1. Configuration -->
+    <!-- JavaScript Files (in correct loading order) -->
+    
+    <!-- 1. Configuration (must load first) -->
     <script src="assets/js/config.js"></script>
     
-    <!-- 2. Utilities -->
+    <!-- 2. Utilities (depends on config) -->
     <script src="assets/js/utils.js"></script>
     
-    <!-- 3. Mock Data -->
+    <!-- 3. Mock Data (must load before services) -->
     <script src="assets/js/mock-data.js"></script>
     
-    <!-- 4. Services -->
+    <!-- 4. Services (depend on config, utils, mock data) -->
     <script src="services/auth-service.js"></script>
     <script src="services/api-service.js"></script>
     <script src="services/visibility-service.js"></script>
     <script src="services/data-service.js"></script>
     
-    <!-- 5. Components (will be created next) -->
-    <script src="components/shared/header.js"></script>
-    <script src="components/shared/sidebar.js"></script>
-    <script src="components/dashboard/dashboard.js"></script>
-    <script src="components/intelligence/intelligence.js"></script>
-    <script src="components/companies/companies.js"></script>
-    <script src="components/contacts/contacts.js"></script>
-    <script src="components/referrals/referrals.js"></script>
-    <script src="components/opportunities/opportunities.js"></script>
-    <script src="components/projects/projects.js"></script>
+    <!-- 5. Components (uncomment as you create them) -->
+    <!-- <script src="components/shared/header.js"></script> -->
+    <!-- <script src="components/shared/sidebar.js"></script> -->
+    <!-- <script src="components/dashboard/dashboard.js"></script> -->
+    <!-- <script src="components/intelligence/intelligence.js"></script> -->
+    <!-- <script src="components/companies/companies.js"></script> -->
+    <!-- <script src="components/contacts/contacts.js"></script> -->
+    <!-- <script src="components/referrals/referrals.js"></script> -->
+    <!-- <script src="components/opportunities/opportunities.js"></script> -->
+    <!-- <script src="components/projects/projects.js"></script> -->
     
-    <!-- 6. Main App -->
+    <!-- 6. Main App (must load last) -->
     <script src="assets/js/app.js"></script>
 </body>
 </html>
