@@ -267,7 +267,7 @@ const DataService = {
   async getLocationsByCompany(companyId) {
     const locations = await this.getLocations();
     return locations.filter(l => 
-      l.company_id === companyId || l.company_norm === companyId
+      l.company_id === companyId || l.company === companyId
     );
   },
 
