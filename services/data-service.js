@@ -120,7 +120,7 @@ const DataService = {
 
     if (this.useMockData) {
       // Use mock data
-      companies = window.MOCK_DATA ? MOCK_DATA.companies : [];
+      companies = window.MockData ? MockData.companies : [];
     } else {
       // Fetch from API
       const response = await ApiService.getCompanies();
@@ -154,8 +154,8 @@ const DataService = {
         created_at: new Date().toISOString()
       };
 
-      if (window.MOCK_DATA) {
-        MOCK_DATA.companies.push(newCompany);
+      if (window.MockData) {
+        MockData.companies.push(newCompany);
       }
 
       result = { success: true, data: newCompany };
@@ -180,15 +180,15 @@ const DataService = {
 
     if (this.useMockData) {
       // Update mock data
-      if (window.MOCK_DATA) {
-        const index = MOCK_DATA.companies.findIndex(c => c.id === id || c.normalized === id);
+      if (window.MockData) {
+        const index = MockData.companies.findIndex(c => c.id === id || c.normalized === id);
         if (index !== -1) {
-          MOCK_DATA.companies[index] = {
-            ...MOCK_DATA.companies[index],
+          MockData.companies[index] = {
+            ...MockData.companies[index],
             ...updates,
             updated_at: new Date().toISOString()
           };
-          result = { success: true, data: MOCK_DATA.companies[index] };
+          result = { success: true, data: MockData.companies[index] };
         } else {
           result = { success: false, error: 'Company not found' };
         }
@@ -214,10 +214,10 @@ const DataService = {
 
     if (this.useMockData) {
       // Delete from mock data
-      if (window.MOCK_DATA) {
-        const index = MOCK_DATA.companies.findIndex(c => c.id === id || c.normalized === id);
+      if (window.MockData) {
+        const index = MockData.companies.findIndex(c => c.id === id || c.normalized === id);
         if (index !== -1) {
-          MOCK_DATA.companies.splice(index, 1);
+          MockData.companies.splice(index, 1);
           result = { success: true };
         } else {
           result = { success: false, error: 'Company not found' };
@@ -251,7 +251,7 @@ const DataService = {
     let locations;
 
     if (this.useMockData) {
-      locations = window.MOCK_DATA ? MOCK_DATA.locations : [];
+      locations = window.MockData ? MockData.locations : [];
     } else {
       const response = await ApiService.getLocations();
       locations = response.success ? response.data : [];
@@ -284,8 +284,8 @@ const DataService = {
         created_at: new Date().toISOString()
       };
 
-      if (window.MOCK_DATA) {
-        MOCK_DATA.locations.push(newLocation);
+      if (window.MockData) {
+        MockData.locations.push(newLocation);
       }
 
       result = { success: true, data: newLocation };
@@ -316,7 +316,7 @@ const DataService = {
     let contacts;
 
     if (this.useMockData) {
-      contacts = window.MOCK_DATA ? MOCK_DATA.contacts : [];
+      contacts = window.MockData ? MockData.contacts : [];
     } else {
       const response = await ApiService.getContacts();
       contacts = response.success ? response.data : [];
@@ -347,8 +347,8 @@ const DataService = {
         created_at: new Date().toISOString()
       };
 
-      if (window.MOCK_DATA) {
-        MOCK_DATA.contacts.push(newContact);
+      if (window.MockData) {
+        MockData.contacts.push(newContact);
       }
 
       result = { success: true, data: newContact };
@@ -371,15 +371,15 @@ const DataService = {
     let result;
 
     if (this.useMockData) {
-      if (window.MOCK_DATA) {
-        const index = MOCK_DATA.contacts.findIndex(c => c.id === id || c.email === id);
+      if (window.MockData) {
+        const index = MockData.contacts.findIndex(c => c.id === id || c.email === id);
         if (index !== -1) {
-          MOCK_DATA.contacts[index] = {
-            ...MOCK_DATA.contacts[index],
+          MockData.contacts[index] = {
+            ...MockData.contacts[index],
             ...updates,
             updated_at: new Date().toISOString()
           };
-          result = { success: true, data: MOCK_DATA.contacts[index] };
+          result = { success: true, data: MockData.contacts[index] };
         } else {
           result = { success: false, error: 'Contact not found' };
         }
@@ -408,7 +408,7 @@ const DataService = {
     let activities;
 
     if (this.useMockData) {
-      activities = window.MOCK_DATA ? MOCK_DATA.activities : [];
+      activities = window.MockData ? MockData.activities : [];
     } else {
       const response = await ApiService.getActivities();
       activities = response.success ? response.data : [];
@@ -428,8 +428,8 @@ const DataService = {
         created_at: new Date().toISOString()
       };
 
-      if (window.MOCK_DATA) {
-        MOCK_DATA.activities.push(newActivity);
+      if (window.MockData) {
+        MockData.activities.push(newActivity);
       }
 
       result = { success: true, data: newActivity };
@@ -457,7 +457,7 @@ const DataService = {
     let gifts;
 
     if (this.useMockData) {
-      gifts = window.MOCK_DATA ? MOCK_DATA.gifts : [];
+      gifts = window.MockData ? MockData.gifts : [];
     } else {
       const response = await ApiService.getGifts();
       gifts = response.success ? response.data : [];
@@ -477,8 +477,8 @@ const DataService = {
         created_at: new Date().toISOString()
       };
 
-      if (window.MOCK_DATA) {
-        MOCK_DATA.gifts.push(newGift);
+      if (window.MockData) {
+        MockData.gifts.push(newGift);
       }
 
       result = { success: true, data: newGift };
@@ -506,7 +506,7 @@ const DataService = {
     let referrals;
 
     if (this.useMockData) {
-      referrals = window.MOCK_DATA ? MOCK_DATA.referrals : [];
+      referrals = window.MockData ? MockData.referrals : [];
     } else {
       const response = await ApiService.getReferrals();
       referrals = response.success ? response.data : [];
@@ -524,7 +524,7 @@ const DataService = {
     let opportunities;
 
     if (this.useMockData) {
-      opportunities = window.MOCK_DATA ? MOCK_DATA.opportunities : [];
+      opportunities = window.MockData ? MockData.opportunities : [];
     } else {
       const response = await ApiService.getOpportunities();
       opportunities = response.success ? response.data : [];
@@ -542,7 +542,7 @@ const DataService = {
     let projects;
 
     if (this.useMockData) {
-      projects = window.MOCK_DATA ? MOCK_DATA.projects : [];
+      projects = window.MockData ? MockData.projects : [];
     } else {
       const response = await ApiService.getProjects();
       projects = response.success ? response.data : [];
@@ -564,7 +564,7 @@ const DataService = {
     let changeLog;
 
     if (this.useMockData) {
-      changeLog = window.MOCK_DATA ? MOCK_DATA.changeLog : [];
+      changeLog = window.MockData ? MockData.changeLog : [];
     } else {
       const response = await ApiService.getChangeLog();
       changeLog = response.success ? response.data : [];
@@ -588,8 +588,8 @@ const DataService = {
     };
 
     if (this.useMockData) {
-      if (window.MOCK_DATA) {
-        MOCK_DATA.changeLog.unshift(entry);
+      if (window.MockData) {
+        MockData.changeLog.unshift(entry);
       }
     } else {
       await ApiService.createChangeLogEntry(entry);
