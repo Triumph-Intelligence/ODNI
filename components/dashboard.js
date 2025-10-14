@@ -17,7 +17,7 @@ const DashboardComponent = {
    */
   async render() {
     try {
-      // Get filtered data based on current org
+      // Get all data from cache
       const companies = await DataService.getCompanies();
       const contacts = await DataService.getContacts();
       const gifts = await DataService.getGifts();
@@ -25,23 +25,22 @@ const DashboardComponent = {
       const opportunities = await DataService.getOpportunities();
       const changeLog = await DataService.getChangeLog();
 
-      // Filter data by visibility
+      // Get current org
       const currentOrg = VisibilityService.getCurrentOrg();
-      const visibleCompanies = companies.filter(c => 
-        VisibilityService.isCompanyVisible(c, currentOrg)
-      );
       
-      const visibleCompanyIds = visibleCompanies.map(c => c.normalized);
-      
-      const visibleContacts = contacts.filter(c => 
-        visibleCompanyIds.includes(c.company)
-      );
+      // Filter data using VisibilityService methods
+      const visibleCompanies = VisibilityService.filterCompanies(companies, currentOrg);
+      const visibleContacts = VisibilityService.filterContacts(contacts, companies, currentOrg);
+      const visibleGifts = VisibilityService.filterGifts(gifts, contacts, companies, currentOrg);
+      const visibleReferrals = VisibilityService.filterReferrals(referrals, contacts, companies, currentOrg);
+      const visibleOpportunities = VisibilityService.filterOpportunities(opportunities, companies, currentOrg);
+      const visibleChangeLog = VisibilityService.filterChangeLog(changeLog, currentOrg);
 
       // Calculate KPIs
-      this.renderKPIs(visibleContacts, gifts, referrals, opportunities);
+      this.renderKPIs(visibleContacts, visibleGifts, visibleReferrals, visibleOpportunities);
 
       // Render activity
-      this.renderActivity(changeLog, currentOrg);
+      this.renderActivity(visibleChangeLog, currentOrg);
 
       console.log('✅ Dashboard rendered');
     } catch (error) {
