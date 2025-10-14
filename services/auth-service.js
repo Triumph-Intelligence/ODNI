@@ -12,7 +12,7 @@ const AuthService = {
     demoUsers: [
         { email: 'demo@triumphatlantic.com', password: 'demo123', name: 'Demo User', org: 'Triumph Atlantic' },
         { email: 'Ryan@triumphatlantic.com', password: 'demo123', name: 'Ryan Morris', org: 'Triumph Atlantic' },
-        { email: 'Rob@triumphatlantic.com', password: 'admin123', name: 'Rob Sebia - Admin User', org: 'Triumph Atlantic' },
+        { email: 'Rob@triumphatlantic.com', password: 'admin123', name: 'Rob Sebia - Admin', org: 'Triumph Atlantic' },
         { email: 'Gianfranco@guerciogroup.com', password: 'demo123', name: 'Gianfranco Guercio', org: 'Guercio Energy Group' },
         { email: 'Bill@myersindustrialsvc.com', password: 'demo123', name: 'Bill Myers', org: 'Myers Industrial Services' },
         { email: 'mike@kmp.com', password: 'demo123', name: 'Mike KMP', org: 'KMP' },
