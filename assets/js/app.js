@@ -182,11 +182,20 @@ const App = {
     initUI() {
         console.log('🎨 Initializing UI...');
         
+        // Update page title with company name
+        this.updatePageTitle();
+        
+        // Show company name in header
+        this.updateHeaderCompanyName();
+        
         // Set organization in header
         const orgSelect = document.getElementById('org-select');
         if (orgSelect && this.state.currentOrg) {
             orgSelect.value = this.state.currentOrg;
         }
+
+        // Show/hide org switcher based on access level
+        this.updateOrgSwitcherVisibility();
 
         // Set user email in header (if user menu exists)
         const userEmail = document.getElementById('user-email');
@@ -194,8 +203,53 @@ const App = {
             userEmail.textContent = this.state.currentUser.email;
         }
 
+        // Show access level badge
+        this.updateAccessBadge(this.state.currentOrg);
+
         // Apply organization theme
         this.applyOrgTheme(this.state.currentOrg);
+    },
+
+    // Update page title with company name
+    updatePageTitle() {
+        document.title = `Triumph Intelligence - ${this.state.currentOrg}`;
+    },
+
+    // Update company name in header
+    updateHeaderCompanyName() {
+        const headerCompanyName = document.getElementById('header-company-name');
+        if (headerCompanyName) {
+            headerCompanyName.textContent = `- ${this.state.currentOrg}`;
+        }
+    },
+
+    // Show/hide org switcher based on access level
+    updateOrgSwitcherVisibility() {
+        const orgSwitcherContainer = document.getElementById('org-switcher-container');
+        if (!orgSwitcherContainer) return;
+
+        // Only show org switcher for Triumph Atlantic users
+        if (this.state.currentOrg === 'Triumph Atlantic') {
+            orgSwitcherContainer.style.display = 'flex';
+        } else {
+            orgSwitcherContainer.style.display = 'none';
+        }
+    },
+
+    // Update access level badge
+    updateAccessBadge(org) {
+        const badge = document.getElementById('access-badge');
+        if (!badge) return;
+
+        if (org === 'Triumph Atlantic') {
+            badge.className = 'badge badge-success';
+            badge.innerHTML = '✓ Full Access';
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.className = 'badge badge-warning';
+            badge.innerHTML = '⊗ Siloed Access';
+            badge.style.display = 'inline-flex';
+        }
     },
 
     // Load all components dynamically
@@ -478,9 +532,12 @@ const App = {
     switchOrganization(org) {
         console.log(`🔄 Switching to organization: ${org}`);
         this.state.currentOrg = org;
+        this.updateAccessBadge(org);
         this.applyOrgTheme(org);
         this.refreshCurrentPage();
-        this.showToast(`Switched to ${org}`, 'success');
+        
+        const accessType = org === 'Triumph Atlantic' ? 'Full Access' : 'Siloed Access';
+        this.showToast(`Switched to ${org} (${accessType})`, 'success');
     },
 
     // Apply organization-specific theme
