@@ -399,38 +399,38 @@ const App = {
             };
         }
 
-        // Filter data based on visibility service
+        // Filter data based on visibility service - FIXED METHOD NAMES
         return {
             companies: companies.filter(c => 
-                VisibilityService.isCompanyVisible(c, org)
+                VisibilityService.canSeeCompany(c, org)  // ✅ Fixed from isCompanyVisible
             ),
             locations: locations.filter(l => {
                 const company = companies.find(c => c.normalized === l.company);
-                return company && VisibilityService.isCompanyVisible(company, org);
+                return company && VisibilityService.canSeeCompany(company, org);  // ✅ Fixed
             }),
             contacts: contacts.filter(c => {
                 const company = companies.find(co => co.normalized === c.company);
-                return company && VisibilityService.isCompanyVisible(company, org);
+                return company && VisibilityService.canSeeCompany(company, org);  // ✅ Fixed
             }),
             gifts: gifts.filter(g => {
                 const contact = contacts.find(c => c.email === g.contact_email);
                 if (!contact) return false;
                 const company = companies.find(co => co.normalized === contact.company);
-                return company && VisibilityService.isCompanyVisible(company, org);
+                return company && VisibilityService.canSeeCompany(company, org);  // ✅ Fixed
             }),
             referrals: referrals.filter(r => {
                 const contact = contacts.find(c => c.email === r.referrer_email);
                 if (!contact) return false;
                 const company = companies.find(co => co.normalized === contact.company);
-                return company && VisibilityService.isCompanyVisible(company, org);
+                return company && VisibilityService.canSeeCompany(company, org);  // ✅ Fixed
             }),
             opportunities: opportunities.filter(o => {
                 const company = companies.find(c => c.name === o.company);
-                return company && VisibilityService.isCompanyVisible(company, org);
+                return company && VisibilityService.canSeeCompany(company, org);  // ✅ Fixed
             }),
             projects: projects.filter(p => {
                 const company = companies.find(c => c.name === p.company);
-                return company && VisibilityService.isCompanyVisible(company, org);
+                return company && VisibilityService.canSeeCompany(company, org);  // ✅ Fixed
             }),
             changeLog: org === 'Triumph Atlantic' ? changeLog : 
                        changeLog.filter(log => log.org === org)
@@ -451,9 +451,9 @@ const App = {
 
         console.log(`🔄 Switching to organization: ${org}`);
         
-        // Update visibility service
+        // Update visibility service - FIXED METHOD NAME
         if (window.VisibilityService) {
-            VisibilityService.setCurrentOrg(org);
+            VisibilityService.setOrganization(org);  // ✅ Fixed from setCurrentOrg
         }
         
         this.state.currentOrg = org;
