@@ -1,16 +1,16 @@
 /**
- * Master Engineer Level Dashboard Component with Interactive US Map (v3)
- * Professional-grade implementation with advanced features
- * - Maintains all existing contractors (Guercio, KMP, Red Door, Byers, Fritz, Stable Works, Myers)
- * - Precision state positioning with geographic accuracy
- * - Advanced animations and transitions
- * - Intelligent clustering for overlapping locations
- * - Heat map overlay capability
- * - Enhanced performance with virtual rendering
- * - Professional tooltips with glassmorphism
- * - Smooth bezier curve connections
- * - Advanced filtering with real-time updates
- * - Mobile-responsive touch controls
+ * Enhanced Dashboard Component with Interactive US Map (v3 — Master)
+ * Complete replacement for components/dashboard.js
+ *
+ * Highlights:
+ * - Keeps existing "company connectors" alive and adds Contractor Flow mode
+ * - Auto-load & merge: DataService + window.MockData
+ * - Filters: Contractors, Trades, Work Types
+ * - View: State density bubbles, labels, connection toggles
+ * - Mini-map with draggable viewport
+ * - Fit-to-data, PNG export
+ * - Keyboard (arrows, +/-/0) & touch (pinch) navigation
+ * - Persists view & filters to localStorage
  */
 
 const DashboardComponent = {
@@ -26,93 +26,88 @@ const DashboardComponent = {
     changeLog: [],
     selectedCompanies: new Set(),
     selectedContractors: new Set(),
+    selectedTrades: new Set(),
+    selectedWorkTypes: new Set(),
+    flowMode: 'company', // 'company' | 'contractor'
+
     zoomLevel: 1,
     panX: 0,
     panY: 0,
     isDragging: false,
     dragStartX: 0,
     dragStartY: 0,
+
+    isSelecting: false,
+    selStart: null,
+
     hoveredLocation: null,
     searchTerm: '',
     currentOrg: null,
+
     showConnections: true,
     showStateLabels: true,
     showStateDensity: true,
-    showHeatmap: false,
-    animationSpeed: 'normal',
-    clusterThreshold: 20,
-    touchStartDistance: null,
-    activeFilters: new Map(),
-    renderCache: new Map(),
-    frameRequest: null
+
+    // runtime flags
+    _eventsAttached: false,
+    _rafTransform: null,
   },
 
-  // Enhanced US State coordinates with precise geographic positioning
+  // US State centroid coords
   stateCoords: {
-    // West Coast
-    'WA': { x: 120, y: 80, name: 'Washington', region: 'west' },
-    'OR': { x: 115, y: 145, name: 'Oregon', region: 'west' },
-    'CA': { x: 95, y: 280, name: 'California', region: 'west' },
-    'NV': { x: 165, y: 265, name: 'Nevada', region: 'west' },
-    'ID': { x: 195, y: 155, name: 'Idaho', region: 'west' },
-    'AK': { x: 110, y: 520, name: 'Alaska', region: 'west' },
-    'HI': { x: 280, y: 540, name: 'Hawaii', region: 'west' },
-    
-    // Mountain
-    'MT': { x: 285, y: 120, name: 'Montana', region: 'mountain' },
-    'ND': { x: 410, y: 115, name: 'North Dakota', region: 'mountain' },
-    'WY': { x: 315, y: 215, name: 'Wyoming', region: 'mountain' },
-    'UT': { x: 245, y: 290, name: 'Utah', region: 'mountain' },
-    'CO': { x: 340, y: 295, name: 'Colorado', region: 'mountain' },
-    'AZ': { x: 235, y: 395, name: 'Arizona', region: 'southwest' },
-    'NM': { x: 330, y: 395, name: 'New Mexico', region: 'southwest' },
-    
-    // Midwest
-    'SD': { x: 410, y: 185, name: 'South Dakota', region: 'midwest' },
-    'NE': { x: 425, y: 260, name: 'Nebraska', region: 'midwest' },
-    'KS': { x: 450, y: 320, name: 'Kansas', region: 'midwest' },
-    'OK': { x: 465, y: 390, name: 'Oklahoma', region: 'southwest' },
-    'TX': { x: 455, y: 470, name: 'Texas', region: 'southwest' },
-    'MN': { x: 510, y: 145, name: 'Minnesota', region: 'midwest' },
-    'IA': { x: 520, y: 235, name: 'Iowa', region: 'midwest' },
-    'MO': { x: 545, y: 325, name: 'Missouri', region: 'midwest' },
-    'AR': { x: 560, y: 395, name: 'Arkansas', region: 'south' },
-    'LA': { x: 570, y: 465, name: 'Louisiana', region: 'south' },
-    'WI': { x: 580, y: 180, name: 'Wisconsin', region: 'midwest' },
-    'IL': { x: 595, y: 280, name: 'Illinois', region: 'midwest' },
-    
-    // Great Lakes & Ohio Valley
-    'MI': { x: 650, y: 205, name: 'Michigan', region: 'greatlakes' },
-    'IN': { x: 665, y: 285, name: 'Indiana', region: 'midwest' },
-    'OH': { x: 715, y: 275, name: 'Ohio', region: 'greatlakes' },
-    'KY': { x: 685, y: 345, name: 'Kentucky', region: 'south' },
-    'TN': { x: 670, y: 380, name: 'Tennessee', region: 'south' },
-    'MS': { x: 600, y: 435, name: 'Mississippi', region: 'south' },
-    'AL': { x: 650, y: 425, name: 'Alabama', region: 'south' },
-    
-    // South Atlantic
-    'WV': { x: 745, y: 305, name: 'West Virginia', region: 'midatlantic' },
-    'VA': { x: 785, y: 335, name: 'Virginia', region: 'south' },
-    'NC': { x: 785, y: 385, name: 'North Carolina', region: 'south' },
-    'SC': { x: 760, y: 425, name: 'South Carolina', region: 'south' },
-    'GA': { x: 715, y: 445, name: 'Georgia', region: 'south' },
-    'FL': { x: 730, y: 520, name: 'Florida', region: 'south' },
-    
-    // Northeast
-    'PA': { x: 780, y: 250, name: 'Pennsylvania', region: 'northeast' },
-    'NY': { x: 820, y: 195, name: 'New York', region: 'northeast' },
-    'VT': { x: 865, y: 160, name: 'Vermont', region: 'northeast' },
-    'NH': { x: 880, y: 175, name: 'New Hampshire', region: 'northeast' },
-    'ME': { x: 895, y: 135, name: 'Maine', region: 'northeast' },
-    'MA': { x: 885, y: 210, name: 'Massachusetts', region: 'northeast' },
-    'CT': { x: 870, y: 235, name: 'Connecticut', region: 'northeast' },
-    'RI': { x: 890, y: 225, name: 'Rhode Island', region: 'northeast' },
-    'NJ': { x: 845, y: 265, name: 'New Jersey', region: 'midatlantic' },
-    'DE': { x: 835, y: 295, name: 'Delaware', region: 'midatlantic' },
-    'MD': { x: 815, y: 305, name: 'Maryland', region: 'midatlantic' }
+    'AL': { x: 730, y: 430, name: 'Alabama' },
+    'AK': { x: 150, y: 550, name: 'Alaska' },
+    'AZ': { x: 250, y: 400, name: 'Arizona' },
+    'AR': { x: 650, y: 400, name: 'Arkansas' },
+    'CA': { x: 150, y: 300, name: 'California' },
+    'CO': { x: 400, y: 320, name: 'Colorado' },
+    'CT': { x: 920, y: 220, name: 'Connecticut' },
+    'DE': { x: 880, y: 280, name: 'Delaware' },
+    'FL': { x: 800, y: 520, name: 'Florida' },
+    'GA': { x: 770, y: 450, name: 'Georgia' },
+    'HI': { x: 300, y: 580, name: 'Hawaii' },
+    'ID': { x: 280, y: 180, name: 'Idaho' },
+    'IL': { x: 680, y: 300, name: 'Illinois' },
+    'IN': { x: 730, y: 300, name: 'Indiana' },
+    'IA': { x: 630, y: 260, name: 'Iowa' },
+    'KS': { x: 550, y: 340, name: 'Kansas' },
+    'KY': { x: 750, y: 350, name: 'Kentucky' },
+    'LA': { x: 650, y: 480, name: 'Louisiana' },
+    'ME': { x: 940, y: 140, name: 'Maine' },
+    'MD': { x: 860, y: 290, name: 'Maryland' },
+    'MA': { x: 930, y: 210, name: 'Massachusetts' },
+    'MI': { x: 740, y: 230, name: 'Michigan' },
+    'MN': { x: 630, y: 180, name: 'Minnesota' },
+    'MS': { x: 680, y: 450, name: 'Mississippi' },
+    'MO': { x: 640, y: 340, name: 'Missouri' },
+    'MT': { x: 350, y: 150, name: 'Montana' },
+    'NE': { x: 530, y: 280, name: 'Nebraska' },
+    'NV': { x: 220, y: 300, name: 'Nevada' },
+    'NH': { x: 930, y: 180, name: 'New Hampshire' },
+    'NJ': { x: 890, y: 260, name: 'New Jersey' },
+    'NM': { x: 380, y: 420, name: 'New Mexico' },
+    'NY': { x: 870, y: 210, name: 'New York' },
+    'NC': { x: 820, y: 390, name: 'North Carolina' },
+    'ND': { x: 530, y: 150, name: 'North Dakota' },
+    'OH': { x: 780, y: 290, name: 'Ohio' },
+    'OK': { x: 550, y: 410, name: 'Oklahoma' },
+    'OR': { x: 180, y: 170, name: 'Oregon' },
+    'PA': { x: 840, y: 260, name: 'Pennsylvania' },
+    'RI': { x: 940, y: 220, name: 'Rhode Island' },
+    'SC': { x: 810, y: 420, name: 'South Carolina' },
+    'SD': { x: 530, y: 220, name: 'South Dakota' },
+    'TN': { x: 740, y: 390, name: 'Tennessee' },
+    'TX': { x: 520, y: 470, name: 'Texas' },
+    'UT': { x: 300, y: 310, name: 'Utah' },
+    'VT': { x: 910, y: 170, name: 'Vermont' },
+    'VA': { x: 830, y: 330, name: 'Virginia' },
+    'WA': { x: 180, y: 100, name: 'Washington' },
+    'WV': { x: 800, y: 320, name: 'West Virginia' },
+    'WI': { x: 680, y: 210, name: 'Wisconsin' },
+    'WY': { x: 380, y: 240, name: 'Wyoming' }
   },
 
-  // Contractor colors with enhanced palette
+  // Contractor colors
   contractorColors: {
     'Guercio Energy Group': '#6366f1',
     'Myers Industrial Services': '#ec4899',
@@ -123,49 +118,31 @@ const DashboardComponent = {
     'Byers': '#8b5cf6'
   },
 
-  // Animation configurations
-  animations: {
-    slow: { duration: 600, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
-    normal: { duration: 300, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
-    fast: { duration: 150, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+  // Work type badges
+  workTypeStyle: {
+    'Capital Project Awarded': { bg: '#eef2ff', fg: '#3730a3' },
+    'Maintenance Contract Awarded': { bg: '#ecfeff', fg: '#155e75' },
+    'Maintenance Contract Discontinued': { bg: '#fff7ed', fg: '#9a3412' }
   },
 
   /**
-   * Initialize dashboard with performance optimizations
+   * Initialize dashboard
    */
   async init() {
-    console.log('🚀 Master Dashboard initializing...');
-    this.setupPerformanceMonitoring();
+    console.log('📊 Dashboard (v3 — Master) initializing...');
     await this.loadData();
+    this.restoreViewFromStorage();
     await this.render();
     this.setupEventListeners();
-    this.startAnimationLoop();
+    this.observeResize();
   },
 
   /**
-   * Performance monitoring
-   */
-  setupPerformanceMonitoring() {
-    if (window.performance && performance.mark) {
-      performance.mark('dashboard-init-start');
-    }
-  },
-
-  /**
-   * Load data with intelligent caching
+   * Load data (with MockData fallback/merge)
    */
   async loadData() {
-    const cacheKey = 'dashboard-data-v3';
-    const cached = this.getCachedData(cacheKey);
-    
-    if (cached && !this.isCacheExpired(cached.timestamp)) {
-      console.log('📦 Using cached data');
-      Object.assign(this.state, cached.data);
-      return;
-    }
-
-    // Load fresh data
-    this.state.currentOrg = window.VisibilityService?.getCurrentOrg?.() ?? null;
+    // current org (optional)
+    this.state.currentOrg = (window.VisibilityService?.getCurrentOrg?.() ?? null);
 
     const [
       companiesDS = [],
@@ -187,7 +164,6 @@ const DashboardComponent = {
       window.DataService?.getLocations?.()
     ]);
 
-    // Merge with MockData
     const MD = window.MockData || {};
     const companies = this._mergeUniqueBy(companiesDS || [], MD.companies || [], 'normalized');
     const contacts = this._mergeUniqueBy(contactsDS || [], MD.contacts || [], 'email');
@@ -198,61 +174,27 @@ const DashboardComponent = {
     const changeLog = this._mergeUniqueBy(changeLogDS || [], MD.changeLog || [], 'timestamp');
     const locations = this._mergeUniqueBy(locationsDS || [], MD.locations || [], (l) => `${l.company}|${l.name}`);
 
-    // Apply visibility filters
     const V = window.VisibilityService || {};
-    this.state.companies = V.filterCompanies?.(companies, this.state.currentOrg) ?? companies;
-    this.state.contacts = V.filterContacts?.(contacts, companies, this.state.currentOrg) ?? contacts;
-    this.state.gifts = V.filterGifts?.(gifts, contacts, companies, this.state.currentOrg) ?? gifts;
-    this.state.referrals = V.filterReferrals?.(referrals, contacts, companies, this.state.currentOrg) ?? referrals;
-    this.state.opportunities = V.filterOpportunities?.(opportunities, companies, this.state.currentOrg) ?? opportunities;
-    this.state.projects = V.filterProjects?.(projects, companies, this.state.currentOrg) ?? projects;
-    this.state.changeLog = V.filterChangeLog?.(changeLog, this.state.currentOrg) ?? changeLog;
-    this.state.locations = V.filterLocations?.(locations, companies, this.state.currentOrg) ?? locations;
+    this.state.companies     = (V.filterCompanies?.(companies, this.state.currentOrg) ?? companies);
+    this.state.contacts      = (V.filterContacts?.(contacts, companies, this.state.currentOrg) ?? contacts);
+    this.state.gifts         = (V.filterGifts?.(gifts, contacts, companies, this.state.currentOrg) ?? gifts);
+    this.state.referrals     = (V.filterReferrals?.(referrals, contacts, companies, this.state.currentOrg) ?? referrals);
+    this.state.opportunities = (V.filterOpportunities?.(opportunities, companies, this.state.currentOrg) ?? opportunities);
+    this.state.projects      = (V.filterProjects?.(projects, companies, this.state.currentOrg) ?? projects);
+    this.state.changeLog     = (V.filterChangeLog?.(changeLog, this.state.currentOrg) ?? changeLog);
+    this.state.locations     = (V.filterLocations?.(locations, companies, this.state.currentOrg) ?? locations);
 
-    // Initialize selections
+    // Select all companies by default
     this.state.selectedCompanies.clear();
     this.state.companies.forEach(c => this.state.selectedCompanies.add(c.name));
+
+    // Select ALL contractors + compute Trades/Work Types
     this.state.selectedContractors = new Set(this.getUniqueContractors());
-
-    // Cache the data
-    this.setCachedData(cacheKey, {
-      companies: this.state.companies,
-      contacts: this.state.contacts,
-      gifts: this.state.gifts,
-      referrals: this.state.referrals,
-      opportunities: this.state.opportunities,
-      projects: this.state.projects,
-      changeLog: this.state.changeLog,
-      locations: this.state.locations
-    });
+    this.state.selectedTrades      = new Set(this.getUniqueTrades());
+    this.state.selectedWorkTypes   = new Set(this.getUniqueWorkTypes());
   },
 
-  // Cache helpers
-  getCachedData(key) {
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : null;
-    } catch (e) {
-      return null;
-    }
-  },
-
-  setCachedData(key, data) {
-    try {
-      localStorage.setItem(key, JSON.stringify({
-        timestamp: Date.now(),
-        data: data
-      }));
-    } catch (e) {
-      console.warn('Cache storage failed:', e);
-    }
-  },
-
-  isCacheExpired(timestamp, ttl = 300000) { // 5 min TTL
-    return Date.now() - timestamp > ttl;
-  },
-
-  // Merge helper
+  // helper: merge arrays by key or key-fn
   _mergeUniqueBy(a, b, keyOrFn) {
     const keyFn = typeof keyOrFn === 'function' ? keyOrFn : (x) => x?.[keyOrFn];
     const map = new Map();
@@ -265,159 +207,116 @@ const DashboardComponent = {
   },
 
   /**
-   * Master render with virtual DOM optimization
+   * Render dashboard
    */
   async render() {
-    requestAnimationFrame(() => {
-      this.renderStatistics();
-      this.renderMap();
-      this.renderControlPanel();
-      this.renderCompanyList();
-      this.renderLegend();
-    });
+    this.renderStatistics();
+    this.renderMap();
+    this.renderControlPanel();
+    this.renderCompanyList();
+    this.renderLegend();
   },
 
   /**
-   * Enhanced statistics with animations
+   * KPI cards
    */
   renderStatistics() {
-    const stats = [
-      { value: this.state.companies.length, label: 'Total Companies', icon: '🏢' },
-      { value: this.state.locations.length, label: 'Total Locations', icon: '📍' },
-      { value: this.state.projects.length, label: 'Active Projects', icon: '🚧' },
-      { value: this.getUniqueContractors().length, label: 'Active Contractors', icon: '👷' }
-    ];
-
     const statsHTML = `
-      <div class="card-grid master-stats" style="margin-bottom: 24px;">
-        ${stats.map((stat, i) => `
-          <div class="card kpi-card" style="animation: slideInUp ${300 + i * 100}ms ease-out;">
-            <div class="kpi-icon">${stat.icon}</div>
-            <div class="kpi-value" data-value="${stat.value}">${stat.value}</div>
-            <div class="kpi-label">${stat.label}</div>
-            <div class="kpi-sparkline" id="sparkline-${i}"></div>
-          </div>
-        `).join('')}
+      <div class="card-grid" style="margin-bottom: 16px;">
+        <div class="card kpi-card">
+          <div class="kpi-value">${this.state.companies.length}</div>
+          <div class="kpi-label">Total Companies</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-value">${this.state.locations.length}</div>
+          <div class="kpi-label">Total Locations</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-value">${this.state.projects.length}</div>
+          <div class="kpi-label">Projects</div>
+        </div>
+        <div class="card kpi-card">
+          <div class="kpi-value">${this.getUniqueContractors().length}</div>
+          <div class="kpi-label">Network Contractors</div>
+        </div>
       </div>
-      <style>
-        @keyframes slideInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .kpi-card {
-          position: relative;
-          overflow: hidden;
-          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-          border: 1px solid rgba(226, 232, 240, 0.7);
-          backdrop-filter: blur(10px);
-        }
-        .kpi-card::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent);
-          animation: shimmer 3s infinite;
-        }
-        @keyframes shimmer {
-          100% { left: 100%; }
-        }
-        .kpi-icon {
-          position: absolute;
-          top: 12px;
-          right: 12px;
-          font-size: 24px;
-          opacity: 0.5;
-        }
-        .kpi-sparkline {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          height: 30px;
-          opacity: 0.2;
-        }
-      </style>
     `;
-    
-    const container = document.getElementById('dashboard-stats');
-    if (container) container.innerHTML = statsHTML;
-    
-    // Animate numbers
-    setTimeout(() => this.animateNumbers(), 100);
+    const statsContainer = document.getElementById('dashboard-stats');
+    if (statsContainer) statsContainer.innerHTML = statsHTML;
   },
 
   /**
-   * Number animation effect
-   */
-  animateNumbers() {
-    document.querySelectorAll('.kpi-value').forEach(el => {
-      const target = parseInt(el.dataset.value);
-      let current = 0;
-      const increment = Math.ceil(target / 30);
-      const timer = setInterval(() => {
-        current += increment;
-        if (current >= target) {
-          current = target;
-          clearInterval(timer);
-        }
-        el.textContent = current;
-      }, 30);
-    });
-  },
-
-  /**
-   * Master-level map rendering with WebGL-inspired effects
+   * Main map
    */
   renderMap() {
     const mapContainer = document.getElementById('us-map-container');
     if (!mapContainer) return;
 
+    // Preserve current transform
     const { zoomLevel, panX, panY } = this.state;
 
+    // SVG
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.id = 'us-map-svg';
     svg.setAttribute('viewBox', '0 0 1000 600');
-    svg.style.cssText = `
-      width: 100%;
-      height: 600px;
-      background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-      border-radius: 16px;
-      cursor: grab;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    `;
+    svg.style.width = '100%';
+    svg.style.height = '600px';
+    svg.style.background = 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
+    svg.style.borderRadius = '12px';
+    svg.style.cursor = 'grab';
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'US contractor network map');
 
-    // Add filters and gradients
-    const defs = this.createSVGDefs();
-    svg.appendChild(defs);
-
-    // Main group
+    // Layers (order matters)
     const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     mainGroup.id = 'map-main-group';
 
-    // Layer order is critical for visual hierarchy
-    this.drawBackgroundGrid(mainGroup);
-    this.drawStates(mainGroup);
-    
-    if (this.state.showHeatmap) {
-      this.drawHeatmap(mainGroup);
-    }
-    
-    if (this.state.showStateDensity) {
-      this.drawStateDensity(mainGroup);
-    }
+    const stateLayer     = document.createElementNS('http://www.w3.org/2000/svg', 'g'); stateLayer.id = 'states-layer';
+    const densityLayer   = document.createElementNS('http://www.w3.org/2000/svg', 'g'); densityLayer.id = 'density-layer';
+    const connectionLayer= document.createElementNS('http://www.w3.org/2000/svg', 'g'); connectionLayer.id = 'connections-layer';
+    const locationLayer  = document.createElementNS('http://www.w3.org/2000/svg', 'g'); locationLayer.id = 'locations-layer';
+    const selectionLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g'); selectionLayer.id = 'selection-layer';
 
+    // Draw states and labels
+    this.drawStates(stateLayer);
+
+    // State density
+    if (this.state.showStateDensity) this.drawStateDensity(densityLayer);
+
+    // Connections
     if (this.state.showConnections) {
-      this.drawConnections(mainGroup);
+      if (this.state.flowMode === 'company') {
+        this.drawCompanyConnections(connectionLayer);
+      } else {
+        this.drawContractorConnections(connectionLayer);
+      }
     }
 
-    this.drawLocationClusters(mainGroup);
-    this.drawLocations(mainGroup);
+    // Pins
+    this.drawLocations(locationLayer);
+
+    // Selection rectangle (hidden until used)
+    const selRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    selRect.id = 'selection-rect';
+    selRect.setAttribute('x', '0'); selRect.setAttribute('y', '0');
+    selRect.setAttribute('width', '0'); selRect.setAttribute('height', '0');
+    selRect.setAttribute('fill', 'rgba(59,130,246,0.12)');
+    selRect.setAttribute('stroke', '#3b82f6');
+    selRect.setAttribute('stroke-dasharray', '4,3');
+    selRect.style.display = 'none';
+    selectionLayer.appendChild(selRect);
+
+    mainGroup.appendChild(stateLayer);
+    mainGroup.appendChild(densityLayer);
+    mainGroup.appendChild(connectionLayer);
+    mainGroup.appendChild(locationLayer);
+    mainGroup.appendChild(selectionLayer);
 
     svg.appendChild(mainGroup);
+
+    // Replace DOM
     mapContainer.innerHTML = '';
+    mapContainer.style.position = 'relative'; // for minimap absolute positioning
     mapContainer.appendChild(svg);
 
     // Restore transform
@@ -425,462 +324,227 @@ const DashboardComponent = {
     this.state.panX = panX;
     this.state.panY = panY;
     this.updateTransform();
+
+    // Mini-map
+    this.renderMiniMap(mapContainer);
+
+    // Save view to storage
+    this.saveViewToStorage();
   },
 
   /**
-   * Create SVG definitions for advanced effects
-   */
-  createSVGDefs() {
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    
-    // Glow filter
-    defs.innerHTML = `
-      <filter id="glow">
-        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-        <feMerge>
-          <feMergeNode in="coloredBlur"/>
-          <feMergeNode in="SourceGraphic"/>
-        </feMerge>
-      </filter>
-      
-      <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="4" stdDeviation="3" flood-opacity="0.2"/>
-      </filter>
-      
-      <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0" />
-        <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0" />
-      </linearGradient>
-      
-      <radialGradient id="pulseGradient">
-        <stop offset="0%" style="stop-color:#fff;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#fff;stop-opacity:0" />
-      </radialGradient>
-      
-      <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-        <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.3"/>
-      </pattern>
-    `;
-    
-    return defs;
-  },
-
-  /**
-   * Draw background grid
-   */
-  drawBackgroundGrid(container) {
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('width', '1000');
-    rect.setAttribute('height', '600');
-    rect.setAttribute('fill', 'url(#grid)');
-    rect.setAttribute('opacity', '0.5');
-    container.appendChild(rect);
-  },
-
-  /**
-   * Enhanced state rendering with regions
+   * States (centroids + labels)
    */
   drawStates(container) {
-    const statesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    statesGroup.id = 'states-group';
+    const frag = document.createDocumentFragment();
 
-    // Regional boundaries (subtle)
-    const regions = this.getRegionalBoundaries();
-    regions.forEach(region => {
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', region.path);
-      path.setAttribute('fill', region.color);
-      path.setAttribute('opacity', '0.05');
-      statesGroup.appendChild(path);
-    });
+    Object.entries(this.stateCoords).forEach(([code, coords]) => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
-    // State nodes
-    Object.entries(this.stateCoords).forEach(([stateCode, coords]) => {
-      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      group.classList.add('state-node');
-      group.dataset.state = stateCode;
-
-      // Outer ring (pulsing)
-      const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      outerRing.setAttribute('cx', coords.x);
-      outerRing.setAttribute('cy', coords.y);
-      outerRing.setAttribute('r', '22');
-      outerRing.setAttribute('fill', 'none');
-      outerRing.setAttribute('stroke', 'rgba(148, 163, 184, 0.2)');
-      outerRing.setAttribute('stroke-width', '1');
-      outerRing.style.cssText = `
-        animation: pulse 3s ease-in-out infinite;
-        transform-origin: ${coords.x}px ${coords.y}px;
-      `;
-
-      // Inner circle
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', coords.x);
       circle.setAttribute('cy', coords.y);
-      circle.setAttribute('r', '16');
-      circle.setAttribute('fill', 'rgba(51, 65, 85, 0.6)');
-      circle.setAttribute('stroke', '#64748b');
-      circle.setAttribute('stroke-width', '1.5');
-      circle.style.transition = 'all 0.3s ease';
+      circle.setAttribute('r', '18');
+      circle.setAttribute('fill', 'rgba(226,232,240,0.25)');
+      circle.setAttribute('stroke', '#cbd5e1');
+      circle.setAttribute('stroke-width', '1');
+      g.appendChild(circle);
 
-      // State code
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', coords.x);
-      text.setAttribute('y', coords.y + 5);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('font-size', '12');
-      text.setAttribute('font-weight', '700');
-      text.setAttribute('fill', '#e2e8f0');
-      text.textContent = stateCode;
-      text.style.display = this.state.showStateLabels ? 'block' : 'none';
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', coords.x);
+      label.setAttribute('y', coords.y + 5);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', '11');
+      label.setAttribute('font-weight', '600');
+      label.setAttribute('fill', '#64748b');
+      label.textContent = code;
+      label.style.display = this.state.showStateLabels ? 'block' : 'none';
+      g.appendChild(label);
 
-      // Hover effect
-      group.addEventListener('mouseenter', () => {
-        circle.setAttribute('r', '20');
-        circle.setAttribute('fill', 'rgba(99, 102, 241, 0.3)');
-        this.showStateTooltip(stateCode, coords);
-      });
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      title.textContent = coords.name;
+      g.appendChild(title);
 
-      group.addEventListener('mouseleave', () => {
-        circle.setAttribute('r', '16');
-        circle.setAttribute('fill', 'rgba(51, 65, 85, 0.6)');
-        this.hideStateTooltip();
-      });
-
-      group.appendChild(outerRing);
-      group.appendChild(circle);
-      group.appendChild(text);
-      statesGroup.appendChild(group);
+      frag.appendChild(g);
     });
 
-    // Add animation styles
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = `
-      @keyframes pulse {
-        0%, 100% { r: 22; opacity: 0.2; }
-        50% { r: 28; opacity: 0.1; }
-      }
-    `;
-    statesGroup.appendChild(style);
-
-    container.appendChild(statesGroup);
+    container.appendChild(frag);
   },
 
   /**
-   * Get regional boundaries for visual grouping
-   */
-  getRegionalBoundaries() {
-    return [
-      { name: 'west', color: '#3b82f6', path: 'M 50 50 L 250 50 L 250 450 L 50 450 Z' },
-      { name: 'mountain', color: '#10b981', path: 'M 250 100 L 400 100 L 400 400 L 250 400 Z' },
-      { name: 'midwest', color: '#f59e0b', path: 'M 400 100 L 650 100 L 650 400 L 400 400 Z' },
-      { name: 'south', color: '#ef4444', path: 'M 550 350 L 800 350 L 800 550 L 550 550 Z' },
-      { name: 'northeast', color: '#8b5cf6', path: 'M 750 100 L 950 100 L 950 300 L 750 300 Z' }
-    ];
-  },
-
-  /**
-   * Advanced density visualization with gradients
+   * State density layer
    */
   drawStateDensity(container) {
-    const densityGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    densityGroup.id = 'state-density-group';
-
     const counts = {};
-    const filteredLocs = this._getFilteredLocationsForMap();
-    filteredLocs.forEach(loc => {
-      counts[loc.state] = (counts[loc.state] ?? 0) + 1;
-    });
+    const filtered = this._getFilteredLocationsForMap();
+    filtered.forEach(loc => { counts[loc.state] = (counts[loc.state] ?? 0) + 1; });
 
     const values = Object.values(counts);
     const max = values.length ? Math.max(...values) : 0;
 
+    const frag = document.createDocumentFragment();
+
     Object.entries(this.stateCoords).forEach(([stateCode, coords]) => {
       const count = counts[stateCode] ?? 0;
       if (!count) return;
-
-      const intensity = max ? count / max : 0;
-      const radius = 8 + Math.round(intensity * 24);
-
-      // Gradient bubble
-      const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
-      gradient.id = `density-${stateCode}`;
-      gradient.innerHTML = `
-        <stop offset="0%" style="stop-color:rgba(99,102,241,${0.4 * intensity});stop-opacity:1" />
-        <stop offset="100%" style="stop-color:rgba(99,102,241,0);stop-opacity:0" />
-      `;
-      densityGroup.appendChild(gradient);
+      const r = 6 + (max ? Math.round((count / max) * 18) : 0);
 
       const bubble = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       bubble.setAttribute('cx', coords.x);
       bubble.setAttribute('cy', coords.y);
-      bubble.setAttribute('r', String(radius));
-      bubble.setAttribute('fill', `url(#density-${stateCode})`);
-      bubble.style.cssText = `
-        animation: breathe ${2 + Math.random() * 2}s ease-in-out infinite;
-        animation-delay: ${Math.random() * 2}s;
-      `;
+      bubble.setAttribute('r', String(r));
+      bubble.setAttribute('fill', 'rgba(99,102,241,0.12)');
+      bubble.setAttribute('stroke', '#6366f1');
+      bubble.setAttribute('stroke-width', '1');
+      bubble.style.cursor = 'pointer';
 
-      // Count badge
-      const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      badge.setAttribute('transform', `translate(${coords.x + radius - 5}, ${coords.y - radius + 5})`);
-      
-      const badgeCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      badgeCircle.setAttribute('r', '12');
-      badgeCircle.setAttribute('fill', '#6366f1');
-      badgeCircle.setAttribute('stroke', '#ffffff');
-      badgeCircle.setAttribute('stroke-width', '2');
-      
-      const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      badgeText.setAttribute('text-anchor', 'middle');
-      badgeText.setAttribute('y', '4');
-      badgeText.setAttribute('font-size', '10');
-      badgeText.setAttribute('font-weight', 'bold');
-      badgeText.setAttribute('fill', 'white');
-      badgeText.textContent = count;
-      
-      badge.appendChild(badgeCircle);
-      badge.appendChild(badgeText);
+      bubble.addEventListener('click', () => {
+        // Quick filter: toggle all companies that have locations in this state
+        const set = new Set(
+          this.state.locations
+            .filter(l => l.state === stateCode)
+            .map(l => this.state.companies.find(c => c.normalized === l.company)?.name)
+            .filter(Boolean)
+        );
+        // If most are off, turn on; else toggle off
+        let onCount = 0; set.forEach(n => { if (this.state.selectedCompanies.has(n)) onCount++; });
+        const turnOn = onCount < set.size / 2;
+        set.forEach(n => turnOn ? this.state.selectedCompanies.add(n) : this.state.selectedCompanies.delete(n));
+        this.render(); // re-render everything for clarity
+      });
 
-      densityGroup.appendChild(bubble);
-      densityGroup.appendChild(badge);
+      const countLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      countLabel.setAttribute('x', coords.x);
+      countLabel.setAttribute('y', coords.y - r - 4);
+      countLabel.setAttribute('text-anchor', 'middle');
+      countLabel.setAttribute('font-size', '10');
+      countLabel.setAttribute('font-weight', '700');
+      countLabel.setAttribute('fill', '#475569');
+      countLabel.textContent = count;
+
+      frag.appendChild(bubble);
+      frag.appendChild(countLabel);
     });
 
-    // Breathing animation
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = `
-      @keyframes breathe {
-        0%, 100% { transform: scale(1); opacity: 0.8; }
-        50% { transform: scale(1.1); opacity: 1; }
-      }
-    `;
-    densityGroup.appendChild(style);
-
-    container.appendChild(densityGroup);
+    container.appendChild(frag);
   },
 
   /**
-   * Draw smooth bezier connections with animation
+   * Connectors — Company Flow (keeps original behavior alive)
    */
-  drawConnections(container) {
-    const connectionsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    connectionsGroup.id = 'connections-group';
-
+  drawCompanyConnections(container) {
     const locationsByCompany = new Map();
     const filteredLocs = this._getFilteredLocationsForMap();
-
     filteredLocs.forEach(loc => {
-      const company = this.state.companies.find(c => c.normalized === loc.company);
-      if (!company || !this.state.selectedCompanies.has(company.name)) return;
-
-      if (!locationsByCompany.has(company.name)) {
-        locationsByCompany.set(company.name, []);
-      }
-      locationsByCompany.get(company.name).push(loc);
+      const comp = this.state.companies.find(c => c.normalized === loc.company);
+      if (!comp || !this.state.selectedCompanies.has(comp.name)) return;
+      if (!locationsByCompany.has(comp.name)) locationsByCompany.set(comp.name, []);
+      locationsByCompany.get(comp.name).push(loc);
     });
 
-    let pathIndex = 0;
-    locationsByCompany.forEach((locations) => {
-      if (locations.length < 2) return;
+    const frag = document.createDocumentFragment();
 
-      const contractorsByLocation = new Map();
-      locations.forEach(loc => {
-        const contractors = this._contractorsForCompanyLocation(loc);
-        contractorsByLocation.set(loc.name, contractors);
-      });
+    locationsByCompany.forEach((locs) => {
+      if (locs.length < 2) return;
+      const contractorsByLoc = new Map();
+      locs.forEach(l => contractorsByLoc.set(l.name, this._contractorsForCompanyLocation(l)));
 
-      for (let i = 0; i < locations.length; i++) {
-        for (let j = i + 1; j < locations.length; j++) {
-          const loc1 = locations[i];
-          const loc2 = locations[j];
-          const coord1 = this.getLocationCoords(loc1);
-          const coord2 = this.getLocationCoords(loc2);
-          if (!coord1 || !coord2) continue;
+      for (let i = 0; i < locs.length; i++) {
+        for (let j = i + 1; j < locs.length; j++) {
+          const a = this.getLocationCoords(locs[i]); if (!a) continue;
+          const b = this.getLocationCoords(locs[j]); if (!b) continue;
 
-          const set1 = contractorsByLocation.get(loc1.name) || new Set();
-          const set2 = contractorsByLocation.get(loc2.name) || new Set();
+          const set1 = contractorsByLoc.get(locs[i].name) || new Set();
+          const set2 = contractorsByLoc.get(locs[j].name) || new Set();
           const shared = [...set1].filter(s => set2.has(s));
-          const color = shared.length ? (this.contractorColors[shared[0]] || '#94a3b8') : '#475569';
+          const color = shared.length ? (this.contractorColors[shared[0]] || '#94a3b8') : '#cbd5e1';
 
-          // Calculate smooth bezier curve
-          const dx = coord2.x - coord1.x;
-          const dy = coord2.y - coord1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          // Dynamic curve based on distance
-          const curveIntensity = Math.min(0.3, dist / 500);
-          const perpX = -dy / dist;
-          const perpY = dx / dist;
-          
-          // Two control points for smooth cubic bezier
-          const cp1x = coord1.x + dx * 0.25 + perpX * dist * curveIntensity;
-          const cp1y = coord1.y + dy * 0.25 + perpY * dist * curveIntensity;
-          const cp2x = coord1.x + dx * 0.75 + perpX * dist * curveIntensity;
-          const cp2y = coord1.y + dy * 0.75 + perpY * dist * curveIntensity;
-
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', `M ${coord1.x} ${coord1.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${coord2.x} ${coord2.y}`);
-          path.setAttribute('fill', 'none');
-          path.setAttribute('stroke', color);
-          path.setAttribute('stroke-width', shared.length ? '2.5' : '1.5');
-          path.setAttribute('stroke-linecap', 'round');
-          path.setAttribute('opacity', shared.length ? '0.6' : '0.25');
-          
-          if (shared.length) {
-            // Animated dash for active connections
-            path.setAttribute('stroke-dasharray', '10,5');
-            path.style.cssText = `
-              animation: dashFlow 3s linear infinite;
-              filter: drop-shadow(0 0 3px ${color}40);
-            `;
-          } else {
-            path.setAttribute('stroke-dasharray', '5,10');
-          }
-
-          // Interactive hover
-          path.addEventListener('mouseenter', () => {
-            path.setAttribute('stroke-width', '4');
-            path.setAttribute('opacity', '1');
-          });
-
-          path.addEventListener('mouseleave', () => {
-            path.setAttribute('stroke-width', shared.length ? '2.5' : '1.5');
-            path.setAttribute('opacity', shared.length ? '0.6' : '0.25');
-          });
-
-          connectionsGroup.appendChild(path);
-          pathIndex++;
+          frag.appendChild(this._curvedPath(a, b, color, shared.length ? 2.6 : 2.2, shared.length ? 0.85 : 0.35, shared.length ? '' : '6,6'));
         }
       }
     });
 
-    // Flow animation
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = `
-      @keyframes dashFlow {
-        to { stroke-dashoffset: -15; }
-      }
-    `;
-    connectionsGroup.appendChild(style);
-
-    container.appendChild(connectionsGroup);
+    container.appendChild(frag);
   },
 
   /**
-   * Intelligent location clustering for dense areas
+   * Connectors — Contractor Flow (nearest-neighbor stitching)
    */
-  drawLocationClusters(container) {
-    const clustersGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    clustersGroup.id = 'clusters-group';
+  drawContractorConnections(container) {
+    const filteredLocs = this._getFilteredLocationsForMap();
 
-    const locations = this._getFilteredLocationsForMap();
-    const clusters = this.calculateClusters(locations);
-
-    clusters.forEach(cluster => {
-      if (cluster.locations.length <= 1) return;
-
-      const avgX = cluster.locations.reduce((sum, l) => sum + this.getLocationCoords(l).x, 0) / cluster.locations.length;
-      const avgY = cluster.locations.reduce((sum, l) => sum + this.getLocationCoords(l).y, 0) / cluster.locations.length;
-
-      const clusterGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      clusterGroup.classList.add('location-cluster');
-      clusterGroup.style.cursor = 'pointer';
-
-      // Cluster background
-      const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      bg.setAttribute('cx', avgX);
-      bg.setAttribute('cy', avgY);
-      bg.setAttribute('r', '30');
-      bg.setAttribute('fill', 'rgba(99, 102, 241, 0.1)');
-      bg.setAttribute('stroke', '#6366f1');
-      bg.setAttribute('stroke-width', '2');
-      bg.setAttribute('stroke-dasharray', '5,5');
-
-      // Cluster count
-      const countBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      countBg.setAttribute('cx', avgX + 20);
-      countBg.setAttribute('cy', avgY - 20);
-      countBg.setAttribute('r', '12');
-      countBg.setAttribute('fill', '#6366f1');
-      countBg.setAttribute('stroke', 'white');
-      countBg.setAttribute('stroke-width', '2');
-
-      const countText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      countText.setAttribute('x', avgX + 20);
-      countText.setAttribute('y', avgY - 16);
-      countText.setAttribute('text-anchor', 'middle');
-      countText.setAttribute('font-size', '11');
-      countText.setAttribute('font-weight', 'bold');
-      countText.setAttribute('fill', 'white');
-      countText.textContent = cluster.locations.length;
-
-      clusterGroup.appendChild(bg);
-      clusterGroup.appendChild(countBg);
-      clusterGroup.appendChild(countText);
-
-      // Click to expand
-      clusterGroup.addEventListener('click', () => {
-        this.expandCluster(cluster);
+    // Group by contractor
+    const byContractor = new Map();
+    filteredLocs.forEach(loc => {
+      const contrs = this._contractorsForCompanyLocation(loc);
+      contrs.forEach(c => {
+        if (!this.state.selectedContractors.has(c)) return;
+        if (!byContractor.has(c)) byContractor.set(c, []);
+        byContractor.get(c).push(loc);
       });
-
-      clustersGroup.appendChild(clusterGroup);
     });
 
-    container.appendChild(clustersGroup);
-  },
+    const frag = document.createDocumentFragment();
 
-  /**
-   * Calculate location clusters
-   */
-  calculateClusters(locations) {
-    const clusters = [];
-    const threshold = this.state.clusterThreshold;
-    const processed = new Set();
+    byContractor.forEach((locs, contractor) => {
+      if (locs.length < 2) return;
+      const color = this.contractorColors[contractor] || '#64748b';
 
-    locations.forEach(loc => {
-      if (processed.has(loc)) return;
-
-      const cluster = { locations: [loc] };
-      const coord = this.getLocationCoords(loc);
-      if (!coord) return;
-
-      locations.forEach(other => {
-        if (processed.has(other) || other === loc) return;
-
-        const otherCoord = this.getLocationCoords(other);
-        if (!otherCoord) return;
-
-        const dist = Math.sqrt(
-          Math.pow(coord.x - otherCoord.x, 2) + 
-          Math.pow(coord.y - otherCoord.y, 2)
-        );
-
-        if (dist < threshold) {
-          cluster.locations.push(other);
-          processed.add(other);
+      // Build point list
+      const pts = locs.map(l => ({ l, p: this.getLocationCoords(l) })).filter(v => !!v.p);
+      // Connect each point to its nearest neighbor with higher index to avoid duplicates
+      for (let i = 0; i < pts.length; i++) {
+        let bestJ = -1, bestD = Infinity;
+        for (let j = 0; j < pts.length; j++) {
+          if (i === j) continue;
+          const dx = pts[j].p.x - pts[i].p.x;
+          const dy = pts[j].p.y - pts[i].p.y;
+          const d = dx*dx + dy*dy;
+          if (d < bestD) { bestD = d; bestJ = j; }
         }
-      });
-
-      if (cluster.locations.length > 1) {
-        cluster.locations.forEach(l => processed.add(l));
-        clusters.push(cluster);
+        if (bestJ > i) {
+          frag.appendChild(this._curvedPath(pts[i].p, pts[bestJ].p, color, 2.6, 0.8, ''));
+        }
       }
     });
 
-    return clusters;
+    container.appendChild(frag);
+  },
+
+  _curvedPath(a, b, color, width = 2.4, opacity = 0.7, dash = '') {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    const curve = dist * 0.19;
+    const cx = midX - dy / dist * curve;
+    const cy = midY + dx / dist * curve;
+
+    path.setAttribute('d', `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', String(width));
+    if (dash) path.setAttribute('stroke-dasharray', dash);
+    path.setAttribute('opacity', String(opacity));
+    path.style.transition = 'opacity .15s ease';
+
+    path.addEventListener('mouseenter', () => path.setAttribute('opacity', '1'));
+    path.addEventListener('mouseleave', () => path.setAttribute('opacity', String(opacity)));
+
+    return path;
   },
 
   /**
-   * Professional location pins with advanced styling
+   * Location markers
    */
   drawLocations(container) {
-    const locationsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    locationsGroup.id = 'locations-group';
-
+    const frag = document.createDocumentFragment();
     const filteredLocs = this._getFilteredLocationsForMap();
-    
-    filteredLocs.forEach((location, index) => {
+
+    filteredLocs.forEach(location => {
       const company = this.state.companies.find(c => c.normalized === location.company);
       if (!company || !this.state.selectedCompanies.has(company.name)) return;
 
@@ -891,1200 +555,376 @@ const DashboardComponent = {
       if (!this._anyContractorSelected(contractors)) return;
 
       const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      node.classList.add('location-pin');
       node.style.cursor = 'pointer';
       node.dataset.company = company.name;
       node.dataset.location = location.name;
 
-      // Advanced pin with animation
-      const pin = this.createAdvancedLocationPin(coords.x, coords.y, contractors, company, index);
+      const pin = this.createLocationPin(coords.x, coords.y, contractors);
       node.appendChild(pin);
 
-      // Enhanced interaction
-      node.addEventListener('mouseenter', (e) => {
+      node.addEventListener('mouseenter', () => {
         this.showLocationTooltip(company, location, contractors);
-        pin.setAttribute('transform', `translate(${coords.x}, ${coords.y}) scale(1.3)`);
-        pin.querySelector('.pin-body')?.setAttribute('filter', 'url(#glow)');
+        const base = `translate(${coords.x}, ${coords.y})`;
+        pin.setAttribute('transform', `${base} scale(1.2)`);
+        node.parentNode?.appendChild(node); // bring to front
       });
-
       node.addEventListener('mouseleave', () => {
         this.hideLocationTooltip();
-        pin.setAttribute('transform', `translate(${coords.x}, ${coords.y}) scale(1)`);
-        pin.querySelector('.pin-body')?.removeAttribute('filter');
+        const base = `translate(${coords.x}, ${coords.y})`;
+        pin.setAttribute('transform', `${base} scale(1)`);
       });
-
       node.addEventListener('click', (e) => {
         e.stopPropagation();
         this.showLocationTooltip(company, location, contractors, true);
-        this.pulseLocation(pin);
       });
 
-      locationsGroup.appendChild(node);
+      frag.appendChild(node);
     });
 
-    container.appendChild(locationsGroup);
+    container.appendChild(frag);
   },
 
   /**
-   * Create advanced location pin with animations
+   * Pin SVG
    */
-  createAdvancedLocationPin(x, y, contractors, company, index) {
+  createLocationPin(x, y, contractors) {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.setAttribute('transform', `translate(${x}, ${y}) scale(1)`);
-    g.style.transition = 'transform 0.3s ease';
 
-    const primaryContractor = Array.from(contractors)[0];
-    const color = this.contractorColors[primaryContractor] || '#6366f1';
+    const primary = Array.from(contractors)[0];
+    const color = this.contractorColors[primary] || '#6366f1';
 
-    // Animated appearance
-    g.style.cssText += `
-      animation: dropIn ${400 + index * 50}ms ease-out;
-      animation-fill-mode: both;
-    `;
-
-    // Shadow
     const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    shadow.setAttribute('cx', '0');
-    shadow.setAttribute('cy', '24');
-    shadow.setAttribute('rx', '8');
-    shadow.setAttribute('ry', '3');
-    shadow.setAttribute('fill', 'rgba(0,0,0,0.3)');
-    shadow.style.cssText = 'animation: shadowPulse 2s ease-in-out infinite;';
+    shadow.setAttribute('cx', '0'); shadow.setAttribute('cy', '22');
+    shadow.setAttribute('rx', '6'); shadow.setAttribute('ry', '2');
+    shadow.setAttribute('fill', 'rgba(0,0,0,0.2)');
 
-    // Pin gradient
-    const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-    gradient.id = `pin-gradient-${x}-${y}`;
-    gradient.innerHTML = `
-      <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
-      <stop offset="100%" style="stop-color:${color}dd;stop-opacity:1" />
-    `;
-    g.appendChild(gradient);
-
-    // Pin body with gradient
     const pin = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    pin.classList.add('pin-body');
-    pin.setAttribute('d', 'M0,-22 C-10,-22 -14,-14 -14,-8 C-14,2 0,24 0,24 C0,24 14,2 14,-8 C14,-14 10,-22 0,-22 Z');
-    pin.setAttribute('fill', `url(#pin-gradient-${x}-${y})`);
+    pin.setAttribute('d', 'M0,-20 C-8,-20 -12,-12 -12,-8 C-12,0 0,20 0,20 C0,20 12,0 12,-8 C12,-12 8,-20 0,-20 Z');
+    pin.setAttribute('fill', color);
     pin.setAttribute('stroke', 'white');
-    pin.setAttribute('stroke-width', '2.5');
-    pin.setAttribute('filter', 'url(#shadow)');
+    pin.setAttribute('stroke-width', '2');
 
-    // Inner circle with pulse
-    const innerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    innerCircle.setAttribute('cx', '0');
-    innerCircle.setAttribute('cy', '-10');
-    innerCircle.setAttribute('r', '5');
-    innerCircle.setAttribute('fill', 'white');
-    innerCircle.style.cssText = 'animation: innerPulse 2s ease-in-out infinite;';
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', '0'); dot.setAttribute('cy', '-10');
+    dot.setAttribute('r', '4'); dot.setAttribute('fill', 'white');
 
-    // Multiple contractors badge
     if (contractors.size > 1) {
-      const badge = this.createMultiContractorBadge(contractors.size);
-      g.appendChild(badge);
+      const bubble = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      bubble.setAttribute('cx', '8'); bubble.setAttribute('cy', '-18');
+      bubble.setAttribute('r', '5'); bubble.setAttribute('fill', '#10b981');
+      bubble.setAttribute('stroke', 'white'); bubble.setAttribute('stroke-width', '1.5');
+
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', '8'); t.setAttribute('y', '-16');
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('font-size', '8'); t.setAttribute('font-weight', 'bold');
+      t.setAttribute('fill', 'white'); t.textContent = contractors.size;
+
+      g.appendChild(bubble); g.appendChild(t);
     }
 
-    // Company initial
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', '0');
-    text.setAttribute('y', '-8');
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-size', '8');
-    text.setAttribute('font-weight', 'bold');
-    text.setAttribute('fill', color);
-    text.textContent = company.name.charAt(0);
-
-    g.appendChild(shadow);
-    g.appendChild(pin);
-    g.appendChild(innerCircle);
-    g.appendChild(text);
-
-    // Add animation styles
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = `
-      @keyframes dropIn {
-        from {
-          opacity: 0;
-          transform: translateY(-50px) scale(0);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      @keyframes shadowPulse {
-        0%, 100% { rx: 8; ry: 3; opacity: 0.3; }
-        50% { rx: 10; ry: 4; opacity: 0.2; }
-      }
-      @keyframes innerPulse {
-        0%, 100% { r: 5; }
-        50% { r: 6; }
-      }
-    `;
-    g.appendChild(style);
-
+    g.appendChild(shadow); g.appendChild(pin); g.appendChild(dot);
     return g;
   },
 
   /**
-   * Create badge for multiple contractors
+   * Coords for location with slight deterministic offset per name
    */
-  createMultiContractorBadge(count) {
-    const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    badge.setAttribute('transform', 'translate(10, -20)');
-
-    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    bg.setAttribute('r', '8');
-    bg.setAttribute('fill', '#10b981');
-    bg.setAttribute('stroke', 'white');
-    bg.setAttribute('stroke-width', '2');
-
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('y', '3');
-    text.setAttribute('font-size', '10');
-    text.setAttribute('font-weight', 'bold');
-    text.setAttribute('fill', 'white');
-    text.textContent = count;
-
-    badge.appendChild(bg);
-    badge.appendChild(text);
-
-    return badge;
+  getLocationCoords(location) {
+    const s = this.stateCoords[location.state];
+    if (!s) return null;
+    const hash = location.name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    const offsetX = ((hash % 20) - 10) * 2;
+    const offsetY = ((hash % 15) - 7) * 2;
+    return { x: s.x + offsetX, y: s.y + offsetY };
   },
 
   /**
-   * Pulse animation for clicked locations
-   */
-  pulseLocation(pin) {
-    const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    pulse.setAttribute('r', '15');
-    pulse.setAttribute('fill', 'none');
-    pulse.setAttribute('stroke', '#6366f1');
-    pulse.setAttribute('stroke-width', '3');
-    pulse.style.cssText = `
-      animation: expandPulse 1s ease-out;
-      pointer-events: none;
-    `;
-
-    pin.appendChild(pulse);
-    setTimeout(() => pulse.remove(), 1000);
-
-    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = `
-      @keyframes expandPulse {
-        from {
-          r: 15;
-          stroke-width: 3;
-          opacity: 1;
-        }
-        to {
-          r: 40;
-          stroke-width: 0;
-          opacity: 0;
-        }
-      }
-    `;
-    pin.appendChild(style);
-  },
-
-  /**
-   * Heat map overlay
-   */
-  drawHeatmap(container) {
-    const heatmapGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    heatmapGroup.id = 'heatmap-group';
-    heatmapGroup.setAttribute('opacity', '0.4');
-
-    const filteredLocs = this._getFilteredLocationsForMap();
-    const heatPoints = [];
-
-    filteredLocs.forEach(loc => {
-      const coords = this.getLocationCoords(loc);
-      if (!coords) return;
-
-      const projects = this.state.projects.filter(p => 
-        p.company === this.state.companies.find(c => c.normalized === loc.company)?.name &&
-        p.location === loc.name
-      ).length;
-
-      heatPoints.push({ x: coords.x, y: coords.y, intensity: projects });
-    });
-
-    const maxIntensity = Math.max(...heatPoints.map(p => p.intensity), 1);
-
-    heatPoints.forEach(point => {
-      const intensity = point.intensity / maxIntensity;
-      const radius = 30 + intensity * 50;
-
-      const radialGradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
-      radialGradient.id = `heat-${point.x}-${point.y}`;
-      radialGradient.innerHTML = `
-        <stop offset="0%" style="stop-color:#ef4444;stop-opacity:${intensity}" />
-        <stop offset="40%" style="stop-color:#f59e0b;stop-opacity:${intensity * 0.5}" />
-        <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:0" />
-      `;
-      heatmapGroup.appendChild(radialGradient);
-
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', point.x);
-      circle.setAttribute('cy', point.y);
-      circle.setAttribute('r', String(radius));
-      circle.setAttribute('fill', `url(#heat-${point.x}-${point.y})`);
-
-      heatmapGroup.appendChild(circle);
-    });
-
-    container.appendChild(heatmapGroup);
-  },
-
-  /**
-   * Enhanced control panel with modern styling
+   * Controls
    */
   renderControlPanel() {
     const panel = document.getElementById('map-controls');
     if (!panel) return;
 
+    const tradeOptions = this.getUniqueTrades().map(t => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" class="trade-checkbox" data-trade="${t}" ${this.state.selectedTrades.has(t) ? 'checked':''}>
+        <span>${t}</span>
+      </label>
+    `).join('');
+
+    const wtOptions = this.getUniqueWorkTypes().map(t => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" class="worktype-checkbox" data-worktype="${t}" ${this.state.selectedWorkTypes.has(t) ? 'checked':''}>
+        <span>${t}</span>
+      </label>
+    `).join('');
+
     panel.innerHTML = `
-      <div class="master-controls">
-        <!-- Search with icon -->
-        <div class="search-container">
-          <span class="search-icon">🔍</span>
-          <input 
-            type="text" 
-            id="company-search" 
-            class="search-input-master" 
-            placeholder="Search companies, locations, contractors..."
-            value="${this.state.searchTerm}"
-          >
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <!-- Search -->
+        <div>
+          <input id="company-search" class="search-input" placeholder="Search companies..."
+            style="width:100%;" value="${this.state.searchTerm}">
         </div>
 
-        <!-- View Controls -->
-        <div class="control-section">
-          <h4 class="control-title">Map Controls</h4>
-          <div class="button-group">
-            <button class="control-btn" id="zoom-in" title="Zoom In">
-              <span class="btn-icon">+</span>
-            </button>
-            <button class="control-btn" id="zoom-out" title="Zoom Out">
-              <span class="btn-icon">−</span>
-            </button>
-            <button class="control-btn" id="zoom-reset" title="Reset View">
-              <span class="btn-icon">⟲</span>
-            </button>
-            <button class="control-btn" id="fullscreen" title="Fullscreen">
-              <span class="btn-icon">⛶</span>
-            </button>
+        <!-- Zoom + View -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm" id="zoom-in"><span style="font-size:18px;">+</span> Zoom In</button>
+          <button class="btn btn-sm" id="zoom-out"><span style="font-size:18px;">−</span> Zoom Out</button>
+          <button class="btn btn-sm" id="zoom-reset"><span style="font-size:16px;">⟲</span> Reset</button>
+          <button class="btn btn-sm" id="fit-to-data">Fit to Data</button>
+          <button class="btn btn-sm" id="export-png">Export PNG</button>
+        </div>
+
+        <!-- Quick company actions -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-ghost" id="select-all">Select All Companies</button>
+          <button class="btn btn-sm btn-ghost" id="deselect-all">Deselect All</button>
+        </div>
+
+        <!-- Flow Mode -->
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:8px;">Flow Mode:</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="radio" name="flowmode" value="company" ${this.state.flowMode==='company'?'checked':''}> Company (original)</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="radio" name="flowmode" value="contractor" ${this.state.flowMode==='contractor'?'checked':''}> Contractor (network)</label>
+        </div>
+
+        <!-- Contractors -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text-secondary);">Filter by Contractor:</label>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-xs" id="contractors-all">All</button>
+              <button class="btn btn-xs" id="contractors-none">None</button>
+            </div>
           </div>
-        </div>
-
-        <!-- Selection Controls -->
-        <div class="control-section">
-          <h4 class="control-title">Quick Selection</h4>
-          <div class="button-group">
-            <button class="control-btn control-btn-ghost" id="select-all">All</button>
-            <button class="control-btn control-btn-ghost" id="deselect-all">None</button>
-            <button class="control-btn control-btn-ghost" id="select-active">Active</button>
-            <button class="control-btn control-btn-ghost" id="select-tier1">Tier 1</button>
-          </div>
-        </div>
-
-        <!-- Contractor Filter -->
-        <div class="control-section">
-          <h4 class="control-title">Contractors</h4>
-          <div id="contractor-checkboxes" class="contractor-list">
+          <div id="contractor-checkboxes" style="display:flex;flex-direction:column;gap:6px;">
             ${this.renderContractorCheckboxes()}
           </div>
         </div>
 
-        <!-- View Options -->
-        <div class="control-section">
-          <h4 class="control-title">View Options</h4>
-          <div class="toggle-list">
-            <label class="toggle-item">
-              <input type="checkbox" id="show-connections" ${this.state.showConnections ? 'checked' : ''}>
-              <span class="toggle-label">Connection Lines</span>
-            </label>
-            <label class="toggle-item">
-              <input type="checkbox" id="show-state-labels" ${this.state.showStateLabels ? 'checked' : ''}>
-              <span class="toggle-label">State Labels</span>
-            </label>
-            <label class="toggle-item">
-              <input type="checkbox" id="show-state-density" ${this.state.showStateDensity ? 'checked' : ''}>
-              <span class="toggle-label">Density Bubbles</span>
-            </label>
-            <label class="toggle-item">
-              <input type="checkbox" id="show-heatmap" ${this.state.showHeatmap ? 'checked' : ''}>
-              <span class="toggle-label">Heat Map</span>
-            </label>
+        <!-- Trades -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text-secondary);">Filter by Trade:</label>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-xs" id="trades-all">All</button>
+              <button class="btn btn-xs" id="trades-none">None</button>
+            </div>
           </div>
+          <div id="trade-checkboxes" style="display:flex;flex-direction:column;gap:6px;">${tradeOptions}</div>
         </div>
 
-        <!-- Animation Speed -->
-        <div class="control-section">
-          <h4 class="control-title">Animation Speed</h4>
-          <select id="animation-speed" class="control-select">
-            <option value="slow" ${this.state.animationSpeed === 'slow' ? 'selected' : ''}>Slow</option>
-            <option value="normal" ${this.state.animationSpeed === 'normal' ? 'selected' : ''}>Normal</option>
-            <option value="fast" ${this.state.animationSpeed === 'fast' ? 'selected' : ''}>Fast</option>
-            <option value="off">Off</option>
-          </select>
+        <!-- Work Types -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text-secondary);">Filter by Work Type:</label>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-xs" id="worktypes-all">All</button>
+              <button class="btn btn-xs" id="worktypes-none">None</button>
+            </div>
+          </div>
+          <div id="worktype-checkboxes" style="display:flex;flex-direction:column;gap:6px;">${wtOptions}</div>
+        </div>
+
+        <!-- View Options -->
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:8px;">View Options:</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="show-connections" ${this.state.showConnections ? 'checked' : ''}> Show Connections
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="show-state-labels" ${this.state.showStateLabels ? 'checked' : ''}> Show State Labels
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="show-state-density" ${this.state.showStateDensity ? 'checked' : ''}> Show State Density
+          </label>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Tip: Hold <strong>Shift</strong> and drag to box‑select locations.</div>
         </div>
       </div>
-
-      <style>
-        .master-controls {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        
-        .search-container {
-          position: relative;
-        }
-        
-        .search-icon {
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          font-size: 16px;
-        }
-        
-        .search-input-master {
-          width: 100%;
-          padding: 10px 12px 10px 36px;
-          border: 2px solid var(--border);
-          border-radius: 10px;
-          font-size: 14px;
-          background: rgba(255,255,255,0.95);
-          transition: all 0.3s ease;
-        }
-        
-        .search-input-master:focus {
-          outline: none;
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
-        }
-        
-        .control-section {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        
-        .control-title {
-          font-size: 12px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--text-muted);
-          margin: 0;
-        }
-        
-        .button-group {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        
-        .control-btn {
-          padding: 8px 14px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          background: white;
-          cursor: pointer;
-          font-size: 13px;
-          font-weight: 500;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-width: 36px;
-        }
-        
-        .control-btn:hover {
-          background: #f1f5f9;
-          border-color: #6366f1;
-          transform: translateY(-1px);
-        }
-        
-        .control-btn-ghost {
-          background: transparent;
-          border-color: rgba(148,163,184,0.3);
-        }
-        
-        .control-btn-ghost:hover {
-          background: rgba(99,102,241,0.05);
-        }
-        
-        .btn-icon {
-          font-size: 18px;
-          font-weight: bold;
-        }
-        
-        .contractor-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        
-        .toggle-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        
-        .toggle-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          cursor: pointer;
-          padding: 6px;
-          border-radius: 6px;
-          transition: background 0.2s ease;
-        }
-        
-        .toggle-item:hover {
-          background: rgba(99,102,241,0.05);
-        }
-        
-        .toggle-label {
-          font-size: 13px;
-          font-weight: 500;
-        }
-        
-        .control-select {
-          padding: 8px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          font-size: 13px;
-          background: white;
-          cursor: pointer;
-        }
-      </style>
     `;
   },
 
   /**
-   * Enhanced contractor checkboxes
+   * Contractor checkboxes
    */
   renderContractorCheckboxes() {
     const contractors = this.getUniqueContractors();
-    return contractors.map(contractor => {
-      const color = this.contractorColors[contractor] || '#6366f1';
-      const checked = this.state.selectedContractors.has(contractor) ? 'checked' : '';
-      const count = this.state.projects.filter(p => p.performed_by === contractor).length;
-      
+    return contractors.map(c => {
+      const color = this.contractorColors[c] || '#6366f1';
+      const checked = this.state.selectedContractors.has(c) ? 'checked' : '';
       return `
-        <label class="contractor-item">
-          <input 
-            type="checkbox" 
-            class="contractor-checkbox" 
-            data-contractor="${contractor}"
-            ${checked}
-          >
-          <span class="contractor-color" style="background: ${color};"></span>
-          <span class="contractor-name">${contractor}</span>
-          <span class="contractor-count">${count}</span>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" class="contractor-checkbox" data-contractor="${c}" ${checked}>
+          <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};"></span>
+          ${c}
+          <button class="btn btn-xxs" data-action="solo-contractor" data-contractor="${c}" style="margin-left:auto;">Only</button>
         </label>
-        <style>
-          .contractor-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 6px;
-            transition: background 0.2s ease;
-          }
-          
-          .contractor-item:hover {
-            background: rgba(99,102,241,0.05);
-          }
-          
-          .contractor-color {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
-          }
-          
-          .contractor-name {
-            flex: 1;
-            font-size: 13px;
-            font-weight: 500;
-          }
-          
-          .contractor-count {
-            font-size: 11px;
-            padding: 2px 6px;
-            background: rgba(148,163,184,0.1);
-            border-radius: 10px;
-            font-weight: 600;
-          }
-        </style>
       `;
     }).join('');
   },
 
   /**
-   * Company list with enhanced features
+   * Company list
    */
   renderCompanyList() {
     const list = document.getElementById('company-list');
     if (!list) return;
-
-    const filteredCompanies = this.getFilteredCompanies();
-    const sortedCompanies = this.sortCompanies(filteredCompanies);
+    const filtered = this.getFilteredCompanies();
 
     list.innerHTML = `
-      <div class="company-list-header">
-        <span class="list-count">${filteredCompanies.length} companies</span>
-        <select id="sort-companies" class="sort-select">
-          <option value="name">Name</option>
-          <option value="locations">Locations</option>
-          <option value="projects">Projects</option>
-          <option value="tier">Tier</option>
-        </select>
-      </div>
-      <div class="company-list-container">
-        ${sortedCompanies.map((company, index) => {
+      <div style="max-height:400px;overflow-y:auto;">
+        ${filtered.map(company => {
           const isSelected = this.state.selectedCompanies.has(company.name);
-          const locations = this.state.locations.filter(l => l.company === company.normalized);
-          const activeProjects = this.state.projects.filter(p => p.company === company.name);
-          const contractors = new Set(activeProjects.map(p => p.performed_by).filter(Boolean));
-
+          const locCount = this.state.locations.filter(l => l.company === company.normalized).length;
+          const projCount = this.state.projects.filter(p => p.company === company.name).length;
           return `
-            <div 
-              class="company-card" 
-              data-company="${company.name}"
-              style="animation-delay: ${index * 30}ms;"
-            >
-              <div class="company-card-header">
-                <input 
-                  type="checkbox" 
-                  class="company-checkbox"
-                  ${isSelected ? 'checked' : ''}
-                  onclick="event.stopPropagation();"
-                >
-                <div class="company-info">
-                  <div class="company-name">${company.name}</div>
-                  <div class="company-tier tier-${company.tier?.toLowerCase()}">${company.tier}</div>
+            <div class="company-item" data-company="${company.name}"
+              style="padding:12px;border-bottom:1px solid var(--border-light);cursor:pointer;background:${isSelected?'rgba(99,102,241,0.05)':'transparent'};">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();" style="cursor:pointer;">
+                <div style="flex:1;">
+                  <div style="font-weight:600;font-size:14px;color:var(--text-primary);">${company.name}</div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+                    ${locCount} location${locCount!==1?'s':''} • ${company.tier} • ${projCount} project${projCount!==1?'s':''}
+                  </div>
                 </div>
-              </div>
-              <div class="company-stats">
-                <div class="stat">
-                  <span class="stat-icon">📍</span>
-                  <span class="stat-value">${locations.length}</span>
-                  <span class="stat-label">Locations</span>
-                </div>
-                <div class="stat">
-                  <span class="stat-icon">🚧</span>
-                  <span class="stat-value">${activeProjects.length}</span>
-                  <span class="stat-label">Projects</span>
-                </div>
-              </div>
-              <div class="company-contractors">
-                ${Array.from(contractors).slice(0, 3).map(c => `
-                  <span class="contractor-chip" style="background: ${this.contractorColors[c]}20; color: ${this.contractorColors[c]};">
-                    ${c.split(' ')[0]}
-                  </span>
-                `).join('')}
-                ${contractors.size > 3 ? `<span class="contractor-chip">+${contractors.size - 3}</span>` : ''}
               </div>
             </div>
           `;
         }).join('')}
       </div>
-      <style>
-        .company-list-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px;
-          border-bottom: 1px solid var(--border-light);
-        }
-        
-        .list-count {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text-muted);
-        }
-        
-        .sort-select {
-          padding: 4px 8px;
-          font-size: 12px;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-        }
-        
-        .company-list-container {
-          max-height: 450px;
-          overflow-y: auto;
-          padding: 12px;
-        }
-        
-        .company-card {
-          padding: 14px;
-          margin-bottom: 10px;
-          background: white;
-          border: 1px solid var(--border-light);
-          border-radius: 10px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          animation: fadeInUp 0.3s ease-out;
-        }
-        
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .company-card:hover {
-          transform: translateX(4px);
-          border-color: #6366f1;
-          box-shadow: 0 4px 12px rgba(99,102,241,0.1);
-        }
-        
-        .company-card-header {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          margin-bottom: 10px;
-        }
-        
-        .company-info {
-          flex: 1;
-        }
-        
-        .company-name {
-          font-weight: 600;
-          font-size: 14px;
-          margin-bottom: 4px;
-        }
-        
-        .company-tier {
-          display: inline-block;
-          font-size: 11px;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-weight: 500;
-        }
-        
-        .tier-tier1 {
-          background: #dbeafe;
-          color: #1e40af;
-        }
-        
-        .tier-tier2 {
-          background: #fce7f3;
-          color: #9f1239;
-        }
-        
-        .tier-tier3 {
-          background: #f3e8ff;
-          color: #6b21a8;
-        }
-        
-        .company-stats {
-          display: flex;
-          gap: 16px;
-          margin-bottom: 10px;
-        }
-        
-        .stat {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-        
-        .stat-icon {
-          font-size: 14px;
-        }
-        
-        .stat-value {
-          font-weight: 600;
-          font-size: 13px;
-        }
-        
-        .stat-label {
-          font-size: 11px;
-          color: var(--text-muted);
-        }
-        
-        .company-contractors {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        
-        .contractor-chip {
-          font-size: 10px;
-          padding: 2px 6px;
-          border-radius: 10px;
-          font-weight: 600;
-        }
-      </style>
     `;
   },
 
   /**
-   * Sort companies
-   */
-  sortCompanies(companies) {
-    return [...companies].sort((a, b) => a.name.localeCompare(b.name));
-  },
-
-  /**
-   * Enhanced legend with statistics
+   * Legend
    */
   renderLegend() {
     const legend = document.getElementById('map-legend');
     if (!legend) return;
-
     const contractors = this.getUniqueContractors();
-    const stats = this.calculateLegendStats();
-    
+
     legend.innerHTML = `
-      <div class="legend-container">
-        <div class="legend-contractors">
-          ${contractors.map(contractor => {
-            const color = this.contractorColors[contractor] || '#6366f1';
-            const count = stats[contractor] || 0;
-            return `
-              <div class="legend-item">
-                <div class="legend-marker" style="background: ${color};"></div>
-                <span class="legend-name">${contractor}</span>
-                <span class="legend-count">${count} projects</span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <div class="legend-indicators">
-          <div class="legend-item">
-            <div class="legend-multi-indicator">2+</div>
-            <span class="legend-name">Multiple Contractors</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-connection active"></div>
-            <span class="legend-name">Active Connection</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-connection inactive"></div>
-            <span class="legend-name">Inactive Connection</span>
-          </div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+        ${contractors.map(c => {
+          const color = this.contractorColors[c] || '#6366f1';
+          return `
+            <div class="contractor-chip" data-contractor="${c}" title="Click to solo this contractor"
+                 style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>
+              <span style="font-size:12px;font-weight:500;color:var(--text-secondary);">${c}</span>
+            </div>
+          `;
+        }).join('')}
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+          <div style="width:20px;height:20px;border-radius:50%;background:#10b981;border:2px solid white;color:white;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;">2+</div>
+          <span style="font-size:12px;font-weight:500;color:var(--text-secondary);">Multiple Contractors</span>
         </div>
       </div>
-      <style>
-        .legend-container {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 20px;
-        }
-        
-        .legend-contractors {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 16px;
-        }
-        
-        .legend-indicators {
-          display: flex;
-          gap: 16px;
-          margin-left: auto;
-        }
-        
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .legend-marker {
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .legend-multi-indicator {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: #10b981;
-          color: white;
-          font-size: 10px;
-          font-weight: bold;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px solid white;
-        }
-        
-        .legend-connection {
-          width: 30px;
-          height: 2px;
-          position: relative;
-        }
-        
-        .legend-connection.active {
-          background: #6366f1;
-        }
-        
-        .legend-connection.inactive {
-          background: repeating-linear-gradient(
-            90deg,
-            #94a3b8,
-            #94a3b8 5px,
-            transparent 5px,
-            transparent 10px
-          );
-        }
-        
-        .legend-name {
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--text-secondary);
-        }
-        
-        .legend-count {
-          font-size: 11px;
-          color: var(--text-muted);
-          font-weight: 400;
-        }
-      </style>
     `;
   },
 
   /**
-   * Calculate legend statistics
-   */
-  calculateLegendStats() {
-    const stats = {};
-    this.state.projects.forEach(p => {
-      const contractor = p.performed_by || p.contractor;
-      if (contractor) {
-        stats[contractor] = (stats[contractor] || 0) + 1;
-      }
-    });
-    return stats;
-  },
-
-  /**
-   * Enhanced tooltips
+   * Tooltip
    */
   showLocationTooltip(company, location, contractors, lock = false) {
-    let tooltip = document.getElementById('location-tooltip');
-    
-    if (!tooltip) {
-      tooltip = document.createElement('div');
-      tooltip.id = 'location-tooltip';
-      tooltip.style.cssText = `
-        position: fixed;
-        background: rgba(255, 255, 255, 0.98);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(226, 232, 240, 0.8);
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        z-index: 10000;
-        pointer-events: none;
-        max-width: 360px;
-        animation: tooltipIn 0.2s ease-out;
+    let tip = document.getElementById('location-tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'location-tooltip';
+      tip.style.cssText = `
+        position: fixed; background: white; border: 1px solid var(--border);
+        border-radius: 8px; padding: 12px; box-shadow: var(--shadow-xl);
+        z-index: 10000; pointer-events: none; max-width: 340px;
       `;
-      document.body.appendChild(tooltip);
-
-      const style = document.createElement('style');
-      style.textContent = `
-        @keyframes tooltipIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `;
-      document.head.appendChild(style);
+      document.body.appendChild(tip);
     }
 
-    const projects = this.state.projects.filter(p => 
+    const projects = this.state.projects.filter(p =>
       p.company === company.name &&
       p.location === location.name &&
-      (!p.performed_by || this.state.selectedContractors.has(p.performed_by))
+      this._projectPassesFilters(p)
     );
 
-    const opportunities = this.state.opportunities.filter(o =>
-      o.company === company.name && o.location === location.name
-    );
-
-    tooltip.innerHTML = `
-      <div class="tooltip-header">
-        <div class="tooltip-title">${company.name}</div>
-        <div class="tooltip-badge tier-${company.tier?.toLowerCase()}">${company.tier}</div>
-      </div>
-      
-      <div class="tooltip-location">
-        📍 ${location.name}, ${location.city}, ${location.state}
-      </div>
-      
-      <div class="tooltip-section">
-        <div class="tooltip-section-title">Contractors (${contractors.size})</div>
-        <div class="tooltip-contractors">
-          ${Array.from(contractors).map(c => `
-            <div class="tooltip-contractor">
-              <span class="contractor-dot" style="background: ${this.contractorColors[c] || '#64748b'};"></span>
-              ${c}
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      
-      <div class="tooltip-section">
-        <div class="tooltip-section-title">Projects (${projects.length})</div>
-        ${projects.length ? projects.slice(0, 3).map(p => `
-          <div class="tooltip-project">
-            <div class="project-name">${p.job}</div>
-            <div class="project-details">
-              ${p.trade || 'N/A'} • ${p.work_type || 'N/A'} • ${p.performed_on || p.start || 'TBD'}
-            </div>
-            <div class="project-contractor">
-              <span class="contractor-dot" style="background: ${this.contractorColors[p.performed_by] || '#64748b'};"></span>
-              ${p.performed_by || 'Unassigned'}
-            </div>
-          </div>
-        `).join('') + (projects.length > 3 ? `<div class="tooltip-more">+${projects.length - 3} more</div>` : '') : '<div class="tooltip-empty">No active projects</div>'}
-      </div>
-      
-      ${opportunities.length ? `
-        <div class="tooltip-section">
-          <div class="tooltip-section-title">Opportunities (${opportunities.length})</div>
-          <div class="tooltip-opportunities">
-            ${opportunities.slice(0, 2).map(o => `
-              <div class="tooltip-opportunity">
-                ${o.job} - ${o.status}
+    const projHTML = projects.length
+      ? projects.slice(0, 5).map(p => {
+          const badge = this.workTypeStyle[p.work_type] || { bg: '#f1f5f9', fg: '#334155' };
+          return `
+            <div style="margin-top:6px;padding:8px;border:1px solid var(--border-light);border-radius:6px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);">${p.job}</div>
+                <span style="font-size:10px;padding:2px 6px;border-radius:999px;background:${badge.bg};color:${badge.fg};">${p.work_type || ''}</span>
               </div>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
-      
-      <style>
-        .tooltip-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
-          padding-bottom: 8px;
-          border-bottom: 2px solid var(--border-light);
-        }
-        
-        .tooltip-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-        
-        .tooltip-badge {
-          font-size: 10px;
-          padding: 3px 8px;
-          border-radius: 12px;
-          font-weight: 600;
-        }
-        
-        .tooltip-location {
-          font-size: 13px;
-          color: var(--text-muted);
-          margin-bottom: 12px;
-        }
-        
-        .tooltip-section {
-          margin-top: 12px;
-        }
-        
-        .tooltip-section-title {
-          font-size: 11px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--text-muted);
-          margin-bottom: 6px;
-        }
-        
-        .tooltip-contractors {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        
-        .tooltip-contractor {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-        }
-        
-        .contractor-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-        }
-        
-        .tooltip-project {
-          padding: 8px;
-          margin-top: 6px;
-          background: rgba(248, 250, 252, 0.8);
-          border-radius: 8px;
-          border: 1px solid var(--border-light);
-        }
-        
-        .project-name {
-          font-size: 12px;
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-        
-        .project-details {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin-bottom: 4px;
-        }
-        
-        .project-contractor {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11px;
-        }
-        
-        .tooltip-more {
-          font-size: 11px;
-          color: #6366f1;
-          margin-top: 6px;
-          font-weight: 500;
-        }
-        
-        .tooltip-empty {
-          font-size: 12px;
-          color: var(--text-muted);
-          font-style: italic;
-        }
-        
-        .tooltip-opportunities {
-          font-size: 12px;
-        }
-        
-        .tooltip-opportunity {
-          padding: 6px;
-          margin-top: 4px;
-          background: rgba(16, 185, 129, 0.1);
-          border-radius: 6px;
-        }
-      </style>
-    `;
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                ${p.trade ?? '-'} • ${p.performed_on ?? (p.start ?? '')}
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;display:inline-flex;align-items:center;gap:6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${this.contractorColors[p.performed_by] || '#64748b'}"></span>
+                ${p.performed_by || '—'}
+              </div>
+            </div>
+          `;
+        }).join('')
+      : `<div style="font-size:12px;color:var(--text-muted);">No projects match current filters here.</div>`;
 
-    tooltip.style.display = 'block';
-    tooltip.dataset.locked = lock ? '1' : '0';
-  },
-
-  /**
-   * State tooltip
-   */
-  showStateTooltip(stateCode, coords) {
-    const locations = this.state.locations.filter(l => l.state === stateCode);
-    const companies = new Set(locations.map(l => l.company));
-    const projects = this.state.projects.filter(p => {
-      const loc = locations.find(l => 
-        l.company === this.state.companies.find(c => c.name === p.company)?.normalized &&
-        l.name === p.location
-      );
-      return loc !== undefined;
-    });
-
-    let tooltip = document.getElementById('state-tooltip');
-    if (!tooltip) {
-      tooltip = document.createElement('div');
-      tooltip.id = 'state-tooltip';
-      tooltip.style.cssText = `
-        position: fixed;
-        background: rgba(30, 41, 59, 0.95);
-        color: white;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-size: 12px;
-        pointer-events: none;
-        z-index: 10001;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-      `;
-      document.body.appendChild(tooltip);
-    }
-
-    tooltip.innerHTML = `
-      <div style="font-weight: 700; margin-bottom: 4px;">${this.stateCoords[stateCode].name}</div>
-      <div style="opacity: 0.9;">
-        ${locations.length} locations • ${companies.size} companies • ${projects.length} projects
+    tip.innerHTML = `
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--text-primary);">${company.name}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">${location.name}, ${location.city}, ${location.state}</div>
+      <div style="font-size:12px;">
+        <strong>Contractors:</strong>
+        ${Array.from(contractors).map(c => `
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${this.contractorColors[c] || '#64748b'};"></span>
+            ${c}
+          </div>`).join('')}
+      </div>
+      <div style="font-size:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light);">
+        <strong>${projects.length}</strong> project${projects.length!==1?'s':''} (filtered)
+        ${projHTML}
       </div>
     `;
 
-    tooltip.style.display = 'block';
-  },
-
-  hideStateTooltip() {
-    const tooltip = document.getElementById('state-tooltip');
-    if (tooltip) tooltip.style.display = 'none';
+    tip.style.display = 'block';
+    tip.dataset.locked = lock ? '1' : '0';
   },
 
   hideLocationTooltip() {
-    const tooltip = document.getElementById('location-tooltip');
-    if (tooltip && tooltip.dataset.locked !== '1') tooltip.style.display = 'none';
+    const tip = document.getElementById('location-tooltip');
+    if (tip && tip.dataset.locked !== '1') tip.style.display = 'none';
   },
 
   updateTooltipPosition(e) {
-    ['location-tooltip', 'state-tooltip'].forEach(id => {
-      const tooltip = document.getElementById(id);
-      if (!tooltip || tooltip.style.display === 'none') return;
-
-      const pad = 15;
-      const w = tooltip.offsetWidth;
-      const h = tooltip.offsetHeight;
-      let x = e.clientX + 15;
-      let y = e.clientY + 15;
-      
-      if (x + w + pad > window.innerWidth) x = e.clientX - w - 15;
-      if (y + h + pad > window.innerHeight) y = e.clientY - h - 15;
-
-      tooltip.style.left = x + 'px';
-      tooltip.style.top = y + 'px';
-    });
+    const tip = document.getElementById('location-tooltip');
+    if (!tip || tip.style.display === 'none') return;
+    const pad = 12;
+    const w = tip.offsetWidth || 280;
+    const h = tip.offsetHeight || 150;
+    let x = e.clientX + 15, y = e.clientY + 15;
+    if (x + w + pad > window.innerWidth)  x = window.innerWidth - w - pad;
+    if (y + h + pad > window.innerHeight) y = window.innerHeight - h - pad;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
   },
 
   /**
-   * Advanced event listeners
+   * Event listeners (attach once)
    */
   setupEventListeners() {
-    // Search with debounce
+    if (this.state._eventsAttached) return;
+    this.state._eventsAttached = true;
+
+    // Search
     const searchInput = document.getElementById('company-search');
     if (searchInput) {
-      let searchTimer;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => {
+      let t; searchInput.addEventListener('input', (e) => {
+        clearTimeout(t);
+        t = setTimeout(() => {
           this.state.searchTerm = e.target.value;
           this.renderCompanyList();
-        }, 300);
+        }, 150);
       });
     }
 
@@ -2092,215 +932,249 @@ const DashboardComponent = {
     document.getElementById('zoom-in')?.addEventListener('click', () => this.zoom(1.3));
     document.getElementById('zoom-out')?.addEventListener('click', () => this.zoom(0.7));
     document.getElementById('zoom-reset')?.addEventListener('click', () => this.resetZoom());
-    document.getElementById('fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
+    document.getElementById('fit-to-data')?.addEventListener('click', () => this.fitToData());
+    document.getElementById('export-png')?.addEventListener('click', () => this.exportPNG());
 
-    // Selection controls
+    // Contractor quick actions
+    document.getElementById('contractors-all')?.addEventListener('click', () => {
+      this.state.selectedContractors = new Set(this.getUniqueContractors());
+      this.renderMap(); this.renderLegend();
+    });
+    document.getElementById('contractors-none')?.addEventListener('click', () => {
+      this.state.selectedContractors.clear();
+      this.renderMap(); this.renderLegend();
+    });
+
+    // Trade/WorkType quick actions
+    document.getElementById('trades-all')?.addEventListener('click', () => {
+      this.state.selectedTrades = new Set(this.getUniqueTrades());
+      this.renderMap();
+    });
+    document.getElementById('trades-none')?.addEventListener('click', () => {
+      this.state.selectedTrades.clear(); this.renderMap();
+    });
+    document.getElementById('worktypes-all')?.addEventListener('click', () => {
+      this.state.selectedWorkTypes = new Set(this.getUniqueWorkTypes()); this.renderMap();
+    });
+    document.getElementById('worktypes-none')?.addEventListener('click', () => {
+      this.state.selectedWorkTypes.clear(); this.renderMap();
+    });
+
+    // Companies select
     document.getElementById('select-all')?.addEventListener('click', () => {
       this.state.companies.forEach(c => this.state.selectedCompanies.add(c.name));
       this.render();
     });
-    
     document.getElementById('deselect-all')?.addEventListener('click', () => {
       this.state.selectedCompanies.clear();
       this.render();
     });
-    
-    document.getElementById('select-active')?.addEventListener('click', () => {
-      this.state.selectedCompanies.clear();
-      this.state.companies
-        .filter(c => this.state.projects.some(p => p.company === c.name))
-        .forEach(c => this.state.selectedCompanies.add(c.name));
-      this.render();
-    });
-    
-    document.getElementById('select-tier1')?.addEventListener('click', () => {
-      this.state.selectedCompanies.clear();
-      this.state.companies
-        .filter(c => c.tier === 'Tier1')
-        .forEach(c => this.state.selectedCompanies.add(c.name));
-      this.render();
+
+    // Company list toggles
+    document.addEventListener('click', (e) => {
+      const item = e.target.closest('.company-item');
+      if (!item) return;
+      const companyName = item.dataset.company;
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      if (this.state.selectedCompanies.has(companyName)) {
+        this.state.selectedCompanies.delete(companyName); if (checkbox) checkbox.checked = false;
+      } else {
+        this.state.selectedCompanies.add(companyName); if (checkbox) checkbox.checked = true;
+      }
+      this.renderMap(); this.renderLegend();
     });
 
-    // Company list interactions
-    document.querySelectorAll('.company-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const companyName = card.dataset.company;
-        const checkbox = card.querySelector('.company-checkbox');
-        
-        if (this.state.selectedCompanies.has(companyName)) {
-          this.state.selectedCompanies.delete(companyName);
-          checkbox.checked = false;
-        } else {
-          this.state.selectedCompanies.add(companyName);
-          checkbox.checked = true;
-        }
-        
-        this.renderMap();
-        this.renderLegend();
-      });
+    // Contractor checkboxes + "Only"
+    document.getElementById('contractor-checkboxes')?.addEventListener('change', (e) => {
+      const cb = e.target.closest('.contractor-checkbox'); if (!cb) return;
+      const name = cb.dataset.contractor;
+      if (e.target.checked) this.state.selectedContractors.add(name);
+      else this.state.selectedContractors.delete(name);
+      this.renderMap(); this.renderLegend();
+    });
+    document.getElementById('contractor-checkboxes')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="solo-contractor"]'); if (!btn) return;
+      const name = btn.dataset.contractor;
+      this.state.selectedContractors = new Set([name]);
+      this.renderMap(); this.renderLegend();
     });
 
-    // Contractor filters
-    document.querySelectorAll('.contractor-checkbox').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const name = e.target.dataset.contractor;
-        if (e.target.checked) {
-          this.state.selectedContractors.add(name);
-        } else {
-          this.state.selectedContractors.delete(name);
-        }
+    // Trades / Work Types
+    document.getElementById('trade-checkboxes')?.addEventListener('change', (e) => {
+      const cb = e.target.closest('.trade-checkbox'); if (!cb) return;
+      const t = cb.dataset.trade;
+      if (e.target.checked) this.state.selectedTrades.add(t);
+      else this.state.selectedTrades.delete(t);
+      this.renderMap();
+    });
+    document.getElementById('worktype-checkboxes')?.addEventListener('change', (e) => {
+      const cb = e.target.closest('.worktype-checkbox'); if (!cb) return;
+      const t = cb.dataset.worktype;
+      if (e.target.checked) this.state.selectedWorkTypes.add(t);
+      else this.state.selectedWorkTypes.delete(t);
+      this.renderMap();
+    });
+
+    // Flow mode
+    document.querySelectorAll('input[name="flowmode"]').forEach(r => {
+      r.addEventListener('change', (e) => {
+        this.state.flowMode = e.target.value === 'contractor' ? 'contractor' : 'company';
         this.renderMap();
       });
     });
 
     // View toggles
     document.getElementById('show-connections')?.addEventListener('change', (e) => {
-      this.state.showConnections = e.target.checked;
-      this.renderMap();
+      this.state.showConnections = !!e.target.checked; this.renderMap();
     });
-    
     document.getElementById('show-state-labels')?.addEventListener('change', (e) => {
-      this.state.showStateLabels = e.target.checked;
-      this.renderMap();
+      this.state.showStateLabels = !!e.target.checked; this.renderMap();
     });
-    
     document.getElementById('show-state-density')?.addEventListener('change', (e) => {
-      this.state.showStateDensity = e.target.checked;
-      this.renderMap();
-    });
-    
-    document.getElementById('show-heatmap')?.addEventListener('change', (e) => {
-      this.state.showHeatmap = e.target.checked;
-      this.renderMap();
+      this.state.showStateDensity = !!e.target.checked; this.renderMap();
     });
 
-    // Animation speed
-    document.getElementById('animation-speed')?.addEventListener('change', (e) => {
-      this.state.animationSpeed = e.target.value;
-      this.updateAnimationSpeed();
-    });
-
-    // Sort companies
-    document.getElementById('sort-companies')?.addEventListener('change', (e) => {
-      this.state.sortBy = e.target.value;
-      this.renderCompanyList();
-    });
-
-    // Map interactions
+    // Map drag/pan/zoom
     const svg = document.getElementById('us-map-svg');
     if (svg) {
-      // Mouse/touch controls
-      svg.addEventListener('mousedown', (e) => this.startDrag(e));
-      svg.addEventListener('mousemove', (e) => this.drag(e));
-      svg.addEventListener('mouseup', () => this.endDrag());
-      svg.addEventListener('mouseleave', () => this.endDrag());
+      svg.addEventListener('mousedown', (e) => this.startPointer(e));
+      svg.addEventListener('mousemove', (e) => this.movePointer(e));
+      svg.addEventListener('mouseup',   () => this.endPointer());
+      svg.addEventListener('mouseleave',() => this.endPointer());
       svg.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
-      
-      // Touch controls for mobile
-      svg.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
-      svg.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
-      svg.addEventListener('touchend', () => this.handleTouchEnd());
+
+      // Touch (pinch)
+      svg.addEventListener('touchstart', (e) => this.touchStart(e), { passive: false });
+      svg.addEventListener('touchmove',  (e) => this.touchMove(e),  { passive: false });
+      svg.addEventListener('touchend',   () => this.touchEnd(),     { passive: false });
     }
 
-    // Global events
-    document.addEventListener('click', (e) => {
-      const tooltip = document.getElementById('location-tooltip');
-      if (tooltip && tooltip.dataset.locked === '1' && !tooltip.contains(e.target)) {
-        tooltip.dataset.locked = '0';
-        tooltip.style.display = 'none';
-      }
-    });
-
+    // Tooltip follows mouse
     document.addEventListener('mousemove', (e) => this.updateTooltipPosition(e));
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT') return;
-      
-      switch(e.key) {
-        case '+':
-        case '=':
-          this.zoom(1.3);
-          break;
-        case '-':
-        case '_':
-          this.zoom(0.7);
-          break;
-        case '0':
-          this.resetZoom();
-          break;
-        case 'f':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            document.getElementById('company-search')?.focus();
-          }
-          break;
+    // Click outside unlocks tooltip
+    document.addEventListener('click', (e) => {
+      const tip = document.getElementById('location-tooltip'); if (!tip) return;
+      if (tip.dataset.locked === '1' && !tip.contains(e.target)) {
+        tip.dataset.locked = '0'; tip.style.display = 'none';
       }
+    });
+
+    // Keyboard navigation
+    window.addEventListener('keydown', (e) => {
+      const step = 40;
+      if (e.key === 'ArrowLeft')  { this.state.panX += step; this.updateTransform(true); }
+      if (e.key === 'ArrowRight') { this.state.panX -= step; this.updateTransform(true); }
+      if (e.key === 'ArrowUp')    { this.state.panY += step; this.updateTransform(true); }
+      if (e.key === 'ArrowDown')  { this.state.panY -= step; this.updateTransform(true); }
+      if (e.key === '+') { this.zoom(1.15); }
+      if (e.key === '-') { this.zoom(0.87); }
+      if (e.key === '0') { this.resetZoom(); }
     });
   },
 
   /**
-   * Touch handlers for mobile
+   * Pointer / selection handling
    */
-  handleTouchStart(e) {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      this.state.touchStartDistance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-    } else if (e.touches.length === 1) {
-      this.startDrag(e.touches[0]);
+  startPointer(e) {
+    const svg = document.getElementById('us-map-svg');
+    if (!svg) return;
+    // Box select with Shift
+    if (e.shiftKey) {
+      this.state.isSelecting = true;
+      const pt = { x: e.clientX, y: e.clientY };
+      this.state.selStart = pt;
+      const rect = document.getElementById('selection-rect');
+      rect.style.display = 'block';
+      rect.setAttribute('x', String(pt.x));
+      rect.setAttribute('y', String(pt.y));
+      rect.setAttribute('width', '0'); rect.setAttribute('height', '0');
+      return;
     }
+    // Pan
+    this.state.isDragging = true;
+    this.state.dragStartX = e.clientX - this.state.panX;
+    this.state.dragStartY = e.clientY - this.state.panY;
+    svg.style.cursor = 'grabbing';
   },
 
-  handleTouchMove(e) {
-    if (e.touches.length === 2 && this.state.touchStartDistance) {
-      e.preventDefault();
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const currentDistance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-      
-      const scale = currentDistance / this.state.touchStartDistance;
-      this.zoom(scale > 1 ? 1.02 : 0.98);
-    } else if (e.touches.length === 1) {
-      this.drag(e.touches[0]);
+  movePointer(e) {
+    if (this.state.isSelecting && this.state.selStart) {
+      const rect = document.getElementById('selection-rect');
+      const x = Math.min(this.state.selStart.x, e.clientX);
+      const y = Math.min(this.state.selStart.y, e.clientY);
+      const w = Math.abs(e.clientX - this.state.selStart.x);
+      const h = Math.abs(e.clientY - this.state.selStart.y);
+      rect.setAttribute('x', String(x));
+      rect.setAttribute('y', String(y));
+      rect.setAttribute('width', String(w));
+      rect.setAttribute('height', String(h));
+      return;
     }
+
+    if (!this.state.isDragging) return;
+    this.state.panX = e.clientX - this.state.dragStartX;
+    this.state.panY = e.clientY - this.state.dragStartY;
+    this.updateTransform(true);
   },
 
-  handleTouchEnd() {
-    this.state.touchStartDistance = null;
-    this.endDrag();
+  endPointer() {
+    const svg = document.getElementById('us-map-svg');
+    if (this.state.isDragging) {
+      this.state.isDragging = false;
+      if (svg) svg.style.cursor = 'grab';
+      this.saveViewToStorage();
+    }
+
+    if (this.state.isSelecting) {
+      this.state.isSelecting = false;
+      const rect = document.getElementById('selection-rect');
+      rect.style.display = 'none';
+      // Compute selection against pin nodes via getBoundingClientRect
+      const sel = {
+        x: parseFloat(rect.getAttribute('x') || '0'),
+        y: parseFloat(rect.getAttribute('y') || '0'),
+        w: parseFloat(rect.getAttribute('width') || '0'),
+        h: parseFloat(rect.getAttribute('height') || '0')
+      };
+      const nodes = document.querySelectorAll('#locations-layer > g');
+      const selectedCompanies = new Set(this.state.selectedCompanies);
+      nodes.forEach(node => {
+        const r = node.getBoundingClientRect();
+        const intersect = !(r.right < sel.x || r.left > sel.x + sel.w || r.bottom < sel.y || r.top > sel.y + sel.h);
+        if (intersect) {
+          const comp = node.dataset.company;
+          if (comp) selectedCompanies.add(comp);
+        }
+      });
+      this.state.selectedCompanies = selectedCompanies;
+      this.renderCompanyList();
+      this.renderMap();
+    }
   },
 
   /**
-   * Map controls
+   * Zoom / pan
    */
   zoom(factor) {
+    const center = { x: 500, y: 300 }; // viewBox center
     const prev = this.state.zoomLevel;
-    this.state.zoomLevel = Math.max(0.5, Math.min(5, prev * factor));
-    this.updateTransform();
+    const next = Math.max(0.5, Math.min(6, prev * factor));
+    // zoom around center of viewport (approx)
+    const k = next / prev;
+    this.state.panX = center.x - k * (center.x - this.state.panX);
+    this.state.panY = center.y - k * (center.y - this.state.panY);
+    this.state.zoomLevel = next;
+    this.updateTransform(true);
+    this.saveViewToStorage();
   },
 
   resetZoom() {
     this.state.zoomLevel = 1;
     this.state.panX = 0;
     this.state.panY = 0;
-    this.updateTransform();
-  },
-
-  toggleFullscreen() {
-    const container = document.getElementById('us-map-container');
-    if (!document.fullscreenElement) {
-      container.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
+    this.updateTransform(true);
+    this.saveViewToStorage();
   },
 
   handleWheel(e) {
@@ -2309,130 +1183,222 @@ const DashboardComponent = {
     this.zoom(factor);
   },
 
-  startDrag(e) {
-    this.state.isDragging = true;
-    this.state.dragStartX = (e.clientX || e.pageX) - this.state.panX;
-    this.state.dragStartY = (e.clientY || e.pageY) - this.state.panY;
-    const svg = document.getElementById('us-map-svg');
-    if (svg) svg.style.cursor = 'grabbing';
-  },
-
-  drag(e) {
-    if (!this.state.isDragging) return;
-    this.state.panX = (e.clientX || e.pageX) - this.state.dragStartX;
-    this.state.panY = (e.clientY || e.pageY) - this.state.dragStartY;
-    this.updateTransform();
-  },
-
-  endDrag() {
-    this.state.isDragging = false;
-    const svg = document.getElementById('us-map-svg');
-    if (svg) svg.style.cursor = 'grab';
-  },
-
-  updateTransform() {
-    const group = document.getElementById('map-main-group');
-    if (group) {
-      const transform = `translate(${this.state.panX}, ${this.state.panY}) scale(${this.state.zoomLevel})`;
-      group.style.transition = 'transform 0.1s ease-out';
-      group.setAttribute('transform', transform);
-    }
+  updateTransform(throttle = false) {
+    const apply = () => {
+      const g = document.getElementById('map-main-group');
+      if (g) g.setAttribute('transform', `translate(${this.state.panX}, ${this.state.panY}) scale(${this.state.zoomLevel})`);
+      this.updateMiniMapViewport();
+    };
+    if (!throttle) { apply(); return; }
+    if (this.state._rafTransform) cancelAnimationFrame(this.state._rafTransform);
+    this.state._rafTransform = requestAnimationFrame(apply);
   },
 
   /**
-   * Animation control
+   * Mini-map
    */
-  updateAnimationSpeed() {
-    const speed = this.state.animationSpeed;
-    const duration = speed === 'off' ? 0 : this.animations[speed]?.duration || 300;
-    
-    document.querySelectorAll('[style*="animation"]').forEach(el => {
-      if (speed === 'off') {
-        el.style.animation = 'none';
-      } else {
-        const currentAnimation = el.style.animation;
-        el.style.animationDuration = `${duration}ms`;
-      }
+  renderMiniMap(container) {
+    // clear existing
+    const old = container.querySelector('#us-map-minimap');
+    if (old) old.remove();
+
+    const mw = 200, mh = 120;
+    const mm = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    mm.id = 'us-map-minimap';
+    mm.setAttribute('viewBox', '0 0 1000 600'); // same coords
+    mm.style.cssText = `
+      position:absolute; right:12px; bottom:12px; width:${mw}px; height:${mh}px;
+      background:rgba(255,255,255,0.85); border:1px solid #e5e7eb; border-radius:8px; backdrop-filter: blur(2px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    `;
+
+    // states dots
+    const statesG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    Object.entries(this.stateCoords).forEach(([_, c]) => {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', c.x); dot.setAttribute('cy', c.y);
+      dot.setAttribute('r', '3'); dot.setAttribute('fill', '#cbd5e1');
+      statesG.appendChild(dot);
     });
+    mm.appendChild(statesG);
+
+    // pins (small)
+    const pinsG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    this._getFilteredLocationsForMap().forEach(loc => {
+      const p = this.getLocationCoords(loc); if (!p) return;
+      const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circ.setAttribute('cx', p.x); circ.setAttribute('cy', p.y);
+      circ.setAttribute('r', '2.5'); circ.setAttribute('fill', '#6366f1'); circ.setAttribute('opacity', '0.75');
+      pinsG.appendChild(circ);
+    });
+    mm.appendChild(pinsG);
+
+    // viewport rect
+    const vp = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    vp.id = 'minimap-viewport';
+    vp.setAttribute('x', '0'); vp.setAttribute('y', '0'); vp.setAttribute('width', '0'); vp.setAttribute('height', '0');
+    vp.setAttribute('fill', 'rgba(99,102,241,0.10)');
+    vp.setAttribute('stroke', '#6366f1'); vp.setAttribute('stroke-width', '2');
+    vp.style.cursor = 'move';
+    mm.appendChild(vp);
+
+    const onMMPos = (evt) => {
+      const rect = mm.getBoundingClientRect();
+      const x = ((evt.clientX - rect.left) / rect.width) * 1000;
+      const y = ((evt.clientY - rect.top) / rect.height) * 600;
+      // center main view on this point
+      const s = this.state.zoomLevel;
+      const vw = 1000 / s, vh = 600 / s;
+      this.state.panX = -(x - vw / 2) * s;
+      this.state.panY = -(y - vh / 2) * s;
+      this.updateTransform();
+      this.saveViewToStorage();
+    };
+
+    let dragging = false;
+    mm.addEventListener('mousedown', (e) => { dragging = true; onMMPos(e); });
+    window.addEventListener('mousemove', (e) => { if (dragging) onMMPos(e); });
+    window.addEventListener('mouseup',   () => { dragging = false; });
+
+    container.appendChild(mm);
+    this.updateMiniMapViewport();
   },
 
-  startAnimationLoop() {
-    const animate = () => {
-      // Periodic updates if needed
-      this.state.frameRequest = requestAnimationFrame(animate);
-    };
-    // Start if animations are enabled
-    if (this.state.animationSpeed !== 'off') {
-      animate();
+  updateMiniMapViewport() {
+    const mm = document.getElementById('us-map-minimap');
+    const vp = document.getElementById('minimap-viewport');
+    if (!mm || !vp) return;
+    const s = this.state.zoomLevel;
+    const vx = -this.state.panX / s;
+    const vy = -this.state.panY / s;
+    const vw = 1000 / s;
+    const vh = 600 / s;
+    vp.setAttribute('x', String(vx));
+    vp.setAttribute('y', String(vy));
+    vp.setAttribute('width', String(vw));
+    vp.setAttribute('height', String(vh));
+  },
+
+  observeResize() {
+    const container = document.getElementById('us-map-container');
+    if (!container || window.ResizeObserver == null) return;
+    const ro = new ResizeObserver(() => this.updateMiniMapViewport());
+    ro.observe(container);
+  },
+
+  /**
+   * Touch (pinch zoom)
+   */
+  touchState: null,
+  touchStart(e) {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const d = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      this.touchState = { startDist: d, startZoom: this.state.zoomLevel };
     }
   },
+  touchMove(e) {
+    if (this.touchState && e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const d = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      const factor = d / (this.touchState.startDist || d);
+      this.state.zoomLevel = Math.max(0.5, Math.min(6, this.touchState.startZoom * factor));
+      this.updateTransform(true);
+    }
+  },
+  touchEnd() { this.touchState = null; this.saveViewToStorage(); },
 
   /**
-   * Cluster expansion
+   * Fit to visible pins
    */
-  expandCluster(cluster) {
-    // Zoom in on cluster and spread locations
-    const avgX = cluster.locations.reduce((sum, l) => sum + this.getLocationCoords(l).x, 0) / cluster.locations.length;
-    const avgY = cluster.locations.reduce((sum, l) => sum + this.getLocationCoords(l).y, 0) / cluster.locations.length;
-    
-    // Center on cluster
-    this.state.panX = 500 - avgX * 2;
-    this.state.panY = 300 - avgY * 2;
-    this.state.zoomLevel = 2;
-    
+  fitToData() {
+    const pts = [];
+    this._getFilteredLocationsForMap().forEach(loc => {
+      const p = this.getLocationCoords(loc); if (p) pts.push(p);
+    });
+    if (!pts.length) return this.resetZoom();
+    const minX = Math.min(...pts.map(p => p.x)), maxX = Math.max(...pts.map(p => p.x));
+    const minY = Math.min(...pts.map(p => p.y)), maxY = Math.max(...pts.map(p => p.y));
+    const pad = 30;
+    const w = (maxX - minX) + pad * 2;
+    const h = (maxY - minY) + pad * 2;
+    const sx = 1000 / w;
+    const sy = 600 / h;
+    const s = Math.min(6, Math.max(0.5, Math.min(sx, sy)));
+    this.state.zoomLevel = s;
+    this.state.panX = -(minX - pad) * s;
+    this.state.panY = -(minY - pad) * s;
     this.updateTransform();
+    this.saveViewToStorage();
   },
 
   /**
-   * Get location coordinates with jitter
+   * PNG Export
    */
-  getLocationCoords(location) {
-    const stateCoord = this.stateCoords[location.state];
-    if (!stateCoord) return null;
-
-    // Deterministic jitter based on location name
-    const hash = location.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const angle = (hash % 360) * Math.PI / 180;
-    const radius = 15 + (hash % 10);
-    
-    const offsetX = Math.cos(angle) * radius;
-    const offsetY = Math.sin(angle) * radius;
-
-    return { 
-      x: stateCoord.x + offsetX, 
-      y: stateCoord.y + offsetY 
+  exportPNG() {
+    const svg = document.getElementById('us-map-svg');
+    if (!svg) return;
+    const xml = new XMLSerializer().serializeToString(svg);
+    const svg64 = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2; // hi-res
+      const canvas = document.createElement('canvas');
+      canvas.width = 1000 * scale; canvas.height = 600 * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url; a.download = 'contractor_map.png';
+      document.body.appendChild(a); a.click(); a.remove();
     };
+    img.src = svg64;
   },
 
   /**
-   * Utility functions
+   * Helpers
    */
   getUniqueContractors() {
-    const contractors = new Set();
-    this.state.projects.forEach(p => {
-      const contractor = p.performed_by || p.contractor;
-      if (contractor) contractors.add(contractor);
-    });
-    
-    // Always include all defined contractors
-    Object.keys(this.contractorColors).forEach(c => contractors.add(c));
-    
-    return Array.from(contractors).sort();
+    const set = new Set();
+    this.state.projects.forEach(p => { const c = p.performed_by || p.contractor; if (c) set.add(c); });
+    ['Guercio Energy Group','KMP','Red Door','Byers','Fritz Staffing','Stable Works','Myers Industrial Services']
+      .forEach(c => set.add(c));
+    return Array.from(set).sort();
+  },
+
+  getUniqueTrades() {
+    const set = new Set();
+    this.state.projects.forEach(p => { if (p.trade) set.add(p.trade); });
+    // safety defaults if empty
+    if (!set.size) ['electrical','mechanical','interior_gc','marketing','staffing'].forEach(t => set.add(t));
+    return Array.from(set).sort();
+  },
+
+  getUniqueWorkTypes() {
+    const set = new Set();
+    this.state.projects.forEach(p => { if (p.work_type) set.add(p.work_type); });
+    if (!set.size) ['Capital Project Awarded','Maintenance Contract Awarded','Maintenance Contract Discontinued'].forEach(t => set.add(t));
+    return Array.from(set).sort();
   },
 
   getFilteredCompanies() {
     const term = (this.state.searchTerm || '').toLowerCase();
     if (!term) return this.state.companies;
-    
-    return this.state.companies.filter(c => 
-      c.name?.toLowerCase().includes(term) ||
-      c.tier?.toLowerCase().includes(term) ||
-      c.status?.toLowerCase().includes(term) ||
-      this.state.locations.some(l => 
-        l.company === c.normalized && 
-        (l.city?.toLowerCase().includes(term) || l.state?.toLowerCase().includes(term))
-      )
+    return this.state.companies.filter(c =>
+      (c.name || '').toLowerCase().includes(term) ||
+      (c.tier || '').toLowerCase().includes(term) ||
+      (c.status || '').toLowerCase().includes(term)
     );
+  },
+
+  _projectPassesFilters(p) {
+    const contractorOk = !p.performed_by || this.state.selectedContractors.has(p.performed_by);
+    const tradeOk = !p.trade || this.state.selectedTrades.has(p.trade);
+    const wtOk = !p.work_type || this.state.selectedWorkTypes.has(p.work_type);
+    return contractorOk && tradeOk && wtOk;
   },
 
   _contractorsForCompanyLocation(location) {
@@ -2440,55 +1406,85 @@ const DashboardComponent = {
     if (!company) return new Set();
 
     const projects = this.state.projects.filter(p =>
-      p.company === company.name && p.location === location.name
+      p.company === company.name && p.location === location.name && this._projectPassesFilters(p)
     );
 
     const contractors = new Set();
-    projects.forEach(p => {
-      const contractor = p.performed_by || p.contractor;
-      if (contractor) contractors.add(contractor);
-    });
+    projects.forEach(p => { const c = p.performed_by || p.contractor; if (c) contractors.add(c); });
 
+    if (contractors.size === 0 && company.contractors) {
+      Object.values(company.contractors).forEach(v => { if (v) contractors.add(v); });
+    }
     return contractors;
   },
 
-  _anyContractorSelected(contractorSet) {
-    if (contractorSet.size === 0) return true;
-    for (const c of contractorSet) {
-      if (this.state.selectedContractors.has(c)) return true;
-    }
+  _anyContractorSelected(set) {
+    if (set.size === 0) return true; // show if unknown
+    for (const c of set) if (this.state.selectedContractors.has(c)) return true;
     return false;
   },
 
   _getFilteredLocationsForMap() {
     return this.state.locations.filter(loc => {
-      const company = this.state.companies.find(c => c.normalized === loc.company);
-      if (!company || !this.state.selectedCompanies.has(company.name)) return false;
-
+      const comp = this.state.companies.find(c => c.normalized === loc.company);
+      if (!comp || !this.state.selectedCompanies.has(comp.name)) return false;
       const contractors = this._contractorsForCompanyLocation(loc);
       return this._anyContractorSelected(contractors);
     });
   },
 
   /**
-   * Refresh dashboard
+   * Persistence
+   */
+  saveViewToStorage() {
+    try {
+      const payload = {
+        zoomLevel: this.state.zoomLevel, panX: this.state.panX, panY: this.state.panY,
+        flowMode: this.state.flowMode,
+        selectedCompanies: Array.from(this.state.selectedCompanies),
+        selectedContractors: Array.from(this.state.selectedContractors),
+        selectedTrades: Array.from(this.state.selectedTrades),
+        selectedWorkTypes: Array.from(this.state.selectedWorkTypes),
+        showConnections: this.state.showConnections,
+        showStateLabels: this.state.showStateLabels,
+        showStateDensity: this.state.showStateDensity,
+        searchTerm: this.state.searchTerm
+      };
+      localStorage.setItem('dashboard-map-v3', JSON.stringify(payload));
+    } catch {}
+  },
+
+  restoreViewFromStorage() {
+    try {
+      const raw = localStorage.getItem('dashboard-map-v3');
+      if (!raw) return;
+      const v = JSON.parse(raw);
+      if (v.zoomLevel) this.state.zoomLevel = v.zoomLevel;
+      if (typeof v.panX === 'number') this.state.panX = v.panX;
+      if (typeof v.panY === 'number') this.state.panY = v.panY;
+      if (v.flowMode) this.state.flowMode = v.flowMode;
+      if (Array.isArray(v.selectedCompanies)) this.state.selectedCompanies = new Set(v.selectedCompanies);
+      if (Array.isArray(v.selectedContractors)) this.state.selectedContractors = new Set(v.selectedContractors);
+      if (Array.isArray(v.selectedTrades)) this.state.selectedTrades = new Set(v.selectedTrades);
+      if (Array.isArray(v.selectedWorkTypes)) this.state.selectedWorkTypes = new Set(v.selectedWorkTypes);
+      if (typeof v.showConnections === 'boolean') this.state.showConnections = v.showConnections;
+      if (typeof v.showStateLabels === 'boolean') this.state.showStateLabels = v.showStateLabels;
+      if (typeof v.showStateDensity === 'boolean') this.state.showStateDensity = v.showStateDensity;
+      if (typeof v.searchTerm === 'string') this.state.searchTerm = v.searchTerm;
+    } catch {}
+  },
+
+  /**
+   * Refresh dashboard (when org changes)
    */
   async refresh() {
-    console.log('🔄 Refreshing master dashboard...');
-    if (this.state.frameRequest) {
-      cancelAnimationFrame(this.state.frameRequest);
-    }
-    
+    console.log('🔄 Refreshing dashboard...');
     await this.loadData();
     await this.render();
-    this.setupEventListeners();
-    this.startAnimationLoop();
-    
-    console.log('✨ Master dashboard refresh complete');
+    // listeners already attached
   }
 };
 
-// Global availability
+// Expose globally
 window.DashboardComponent = DashboardComponent;
-
-console.log('🚀 Master Engineer Level Dashboard Component v3 loaded');
+console.log('📊 Enhanced Dashboard Component (v3 — Master) loaded and ready');
