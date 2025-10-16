@@ -1,6 +1,6 @@
 /**
  * Mock Data for Triumph Intelligence
- * Comprehensive dataset for demo purposes
+ * Enhanced with location-based contractor relationships
  */
 
 const MockData = {
@@ -9,41 +9,41 @@ const MockData = {
         { name: 'PepsiCo', normalized: 'pepsico', tier: 'Enterprise', status: 'Active', hq_state: 'NY', 
           contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
         { name: 'Coca-Cola Company', normalized: 'coca-cola', tier: 'Enterprise', status: 'Active', hq_state: 'GA',
-          contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: 'Stable Works', marketing: 'Red Door', staffing: '' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: 'Red Door', staffing: 'Byers' }},
         { name: 'Mondelez International', normalized: 'mondelez', tier: 'Enterprise', status: 'Active', hq_state: 'IL',
-          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: '', staffing: 'Byers' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: 'Red Door', staffing: 'Byers' }},
         { name: 'Nestlé USA', normalized: 'nestle-usa', tier: 'Large', status: 'Prospect', hq_state: 'CA',
-          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: '', marketing: '', staffing: 'Byers' }},
+          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: '', staffing: 'Byers' }},
         { name: 'General Mills', normalized: 'general-mills', tier: 'Large', status: 'Active', hq_state: 'MN',
-          contractors: { electrical: '', mechanical: '', interior_gc: 'KMP', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: 'KMP', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
         { name: 'Kellogg Company', normalized: 'kellogg', tier: 'Large', status: 'Active', hq_state: 'MI',
-          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: '', staffing: '' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: '', staffing: 'Fritz Staffing' }},
         { name: 'Mars Incorporated', normalized: 'mars', tier: 'Enterprise', status: 'Prospect', hq_state: 'VA',
-          contractors: { electrical: '', mechanical: '', interior_gc: 'KMP', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
         { name: 'Kraft Heinz', normalized: 'kraft-heinz', tier: 'Enterprise', status: 'Active', hq_state: 'IL',
           contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: '', staffing: 'Byers' }},
         { name: 'Conagra Brands', normalized: 'conagra', tier: 'Large', status: 'Active', hq_state: 'IL',
-          contractors: { electrical: '', mechanical: '', interior_gc: 'KMP', marketing: 'Red Door', staffing: '' }},
+          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: 'Red Door', staffing: '' }},
         { name: 'Campbell Soup Company', normalized: 'campbell', tier: 'Mid', status: 'Prospect', hq_state: 'NJ',
-          contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: '', marketing: '', staffing: 'Fritz Staffing' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: 'Stable Works', marketing: '', staffing: 'Fritz Staffing' }},
         { name: 'Tyson Foods', normalized: 'tyson', tier: 'Enterprise', status: 'Active', hq_state: 'AR',
           contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: '', staffing: 'Fritz Staffing' }},
         { name: 'JBS USA', normalized: 'jbs', tier: 'Enterprise', status: 'Active', hq_state: 'CO',
           contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: 'Red Door', staffing: 'Byers' }},
         { name: 'Smithfield Foods', normalized: 'smithfield', tier: 'Large', status: 'Prospect', hq_state: 'VA',
-          contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: 'KMP', marketing: '', staffing: '' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: '', staffing: '' }},
         { name: 'Hormel Foods', normalized: 'hormel', tier: 'Large', status: 'Active', hq_state: 'MN',
-          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: '', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
+          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: 'Red Door', staffing: 'Fritz Staffing' }},
         { name: "Pilgrim's Pride", normalized: 'pilgrims', tier: 'Large', status: 'Active', hq_state: 'CO',
           contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: 'Stable Works', marketing: '', staffing: 'Byers' }},
         { name: 'Perdue Farms', normalized: 'perdue', tier: 'Mid', status: 'Prospect', hq_state: 'MD',
           contractors: { electrical: '', mechanical: '', interior_gc: 'KMP', marketing: 'Red Door', staffing: '' }},
         { name: 'Dean Foods', normalized: 'dean', tier: 'Mid', status: 'Active', hq_state: 'TX',
-          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: '', marketing: '', staffing: 'Fritz Staffing' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'Stable Works', marketing: '', staffing: 'Fritz Staffing' }},
         { name: 'Blue Diamond Growers', normalized: 'blue-diamond', tier: 'Mid', status: 'Prospect', hq_state: 'CA',
           contractors: { electrical: '', mechanical: '', interior_gc: 'Stable Works', marketing: 'Red Door', staffing: '' }},
         { name: 'Land O Lakes', normalized: 'land-o-lakes', tier: 'Large', status: 'Active', hq_state: 'MN',
-          contractors: { electrical: '', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: '', staffing: 'Byers' }},
+          contractors: { electrical: 'Guercio Energy Group', mechanical: 'Myers Industrial Services', interior_gc: 'KMP', marketing: '', staffing: 'Byers' }},
         { name: 'Ocean Spray', normalized: 'ocean-spray', tier: 'Mid', status: 'Active', hq_state: 'MA',
           contractors: { electrical: 'Guercio Energy Group', mechanical: '', interior_gc: '', marketing: 'Red Door', staffing: 'Fritz Staffing' }}
     ],
@@ -266,7 +266,7 @@ const MockData = {
         { contact_email: 'margaret.perry@oceanspray.com', description: 'Premium Coffee Set', value: 70.00, date: '2024-10-01' },
         { contact_email: 'dorothy.russell@oceanspray.com', description: 'Wine Gift Set', value: 90.00, date: '2024-08-28' },
         { contact_email: 'john.smith@pepsico.com', description: 'Tech Accessories', value: 80.00, date: '2024-06-15' },
-        { contact_email: 'david.williams@coca-cola.com', description: 'Executive Desk Set', value: 110.00, date: '2024-07-20' },
+        { contact_email: 'dwilliams@coca-cola.com', description: 'Executive Desk Set', value: 110.00, date: '2024-07-20' },
         { contact_email: 'chris.moore@genmills.com', description: 'Wireless Headphones', value: 125.00, date: '2024-08-05' },
         { contact_email: 'michelle.white@kellogg.com', description: 'Fitness Tracker', value: 95.00, date: '2024-06-28' },
         { contact_email: 'rachel.walker@kraftheinz.com', description: 'Leather Portfolio', value: 85.00, date: '2024-07-10' },
@@ -300,32 +300,79 @@ const MockData = {
     
     // 12 Opportunities
     opportunities: [
-        { company: 'PepsiCo', location: 'Dallas Plant', job: 'Electrical System Upgrade', contact: 'Emily Rodriguez', start: '2025-02-01', valuation: '$125,000' },
-        { company: 'Coca-Cola Company', location: 'Seattle Facility', job: 'HVAC Replacement', contact: 'New Contact', start: '2025-01-15', valuation: '$85,000' },
-        { company: 'Mondelez International', location: 'Portland Facility', job: 'Interior Renovation', contact: 'Patricia Wilson', start: '2025-03-01', valuation: '$200,000' },
-        { company: 'Kellogg Company', location: 'Omaha Facility', job: 'Electrical & Mechanical Upgrades', contact: 'New Contact', start: '2025-02-15', valuation: '$150,000' },
-        { company: 'Mars Incorporated', location: 'Waco Facility', job: 'Complete Facility Modernization', contact: 'New Contact', start: '2025-04-01', valuation: '$350,000' },
-        { company: 'Tyson Foods', location: 'Amarillo Facility', job: 'Production Line Electrical', contact: 'William Foster', start: '2025-01-20', valuation: '$175,000' },
-        { company: 'JBS USA', location: 'Marshalltown Facility', job: 'Refrigeration System Upgrade', contact: 'Gregory Hall', start: '2025-03-15', valuation: '$220,000' },
-        { company: 'Hormel Foods', location: 'Dubuque Facility', job: 'Building Automation System', contact: 'Peter Brooks', start: '2025-02-10', valuation: '$95,000' },
-        { company: 'Land O Lakes', location: 'Kiel Facility', job: 'Lighting & Electrical Upgrade', contact: 'Ronald Gray', start: '2025-01-25', valuation: '$110,000' },
-        { company: 'Ocean Spray', location: 'Kenosha Plant', job: 'Manufacturing Equipment Install', contact: 'George Butler', start: '2025-03-20', valuation: '$185,000' },
-        { company: 'Dean Foods', location: 'Louisville Plant', job: 'HVAC & Mechanical Systems', contact: 'Charles Powell', start: '2025-02-05', valuation: '$145,000' },
-        { company: 'Kraft Heinz', location: 'Madison Facility', job: 'Facility Expansion - Electrical', contact: 'New Contact', start: '2025-04-15', valuation: '$280,000' }
+        { company: 'PepsiCo', location: 'Dallas Plant', job: 'Electrical System Upgrade', contact: 'Emily Rodriguez', start: '2025-02-01', valuation: '$125,000', status: 'Proposal' },
+        { company: 'Coca-Cola Company', location: 'Seattle Facility', job: 'HVAC Replacement', contact: 'New Contact', start: '2025-01-15', valuation: '$85,000', status: 'Qualification' },
+        { company: 'Mondelez International', location: 'Portland Facility', job: 'Interior Renovation', contact: 'Patricia Wilson', start: '2025-03-01', valuation: '$200,000', status: 'Discovery' },
+        { company: 'Kellogg Company', location: 'Omaha Facility', job: 'Electrical & Mechanical Upgrades', contact: 'New Contact', start: '2025-02-15', valuation: '$150,000', status: 'Qualification' },
+        { company: 'Mars Incorporated', location: 'Waco Facility', job: 'Complete Facility Modernization', contact: 'New Contact', start: '2025-04-01', valuation: '$350,000', status: 'Discovery' },
+        { company: 'Tyson Foods', location: 'Amarillo Facility', job: 'Production Line Electrical', contact: 'William Foster', start: '2025-01-20', valuation: '$175,000', status: 'Proposal' },
+        { company: 'JBS USA', location: 'Marshalltown Facility', job: 'Refrigeration System Upgrade', contact: 'Gregory Hall', start: '2025-03-15', valuation: '$220,000', status: 'Proposal' },
+        { company: 'Hormel Foods', location: 'Dubuque Facility', job: 'Building Automation System', contact: 'Peter Brooks', start: '2025-02-10', valuation: '$95,000', status: 'Qualification' },
+        { company: 'Land O Lakes', location: 'Kiel Facility', job: 'Lighting & Electrical Upgrade', contact: 'Ronald Gray', start: '2025-01-25', valuation: '$110,000', status: 'Discovery' },
+        { company: 'Ocean Spray', location: 'Kenosha Plant', job: 'Manufacturing Equipment Install', contact: 'George Butler', start: '2025-03-20', valuation: '$185,000', status: 'Proposal' },
+        { company: 'Dean Foods', location: 'Louisville Plant', job: 'HVAC & Mechanical Systems', contact: 'Charles Powell', start: '2025-02-05', valuation: '$145,000', status: 'Qualification' },
+        { company: 'Kraft Heinz', location: 'Madison Facility', job: 'Facility Expansion - Electrical', contact: 'New Contact', start: '2025-04-15', valuation: '$280,000', status: 'Discovery' }
     ],
     
-    // 10 Active Projects
+    // 🎯 EXPANDED: 35 Active Projects (showing clear location-based contractor patterns)
     projects: [
-        { company: 'PepsiCo', location: 'Chicago Distribution', job: 'Warehouse Lighting Upgrade', contact: 'Michael Chen', start: '2024-09-01', end: '2024-12-15', valuation: '$95,000' },
-        { company: 'Coca-Cola Company', location: 'Atlanta HQ', job: 'Office Renovation - Floor 3', contact: 'David Williams', start: '2024-10-01', end: '2025-01-28', valuation: '$180,000' },
-        { company: 'General Mills', location: 'Buffalo Plant', job: 'Production Line Electrical', contact: 'Amanda Davis', start: '2024-08-15', end: '2024-12-30', valuation: '$220,000' },
-        { company: 'Kraft Heinz', location: 'Chicago HQ', job: 'Building Automation System', contact: 'Rachel Walker', start: '2024-09-15', end: '2025-02-01', valuation: '$165,000' },
+        // PEPSICO - Multi-location with different contractors
+        { company: 'PepsiCo', location: 'Newark Bottling', job: 'Electrical Panel Upgrade', contact: 'Sarah Johnson', start: '2024-09-01', end: '2024-12-15', valuation: '$95,000' },
+        { company: 'PepsiCo', location: 'Chicago Distribution', job: 'Warehouse Lighting System', contact: 'Michael Chen', start: '2024-08-15', end: '2024-11-30', valuation: '$78,000' },
+        { company: 'PepsiCo', location: 'Dallas Plant', job: 'HVAC Mechanical Overhaul', contact: 'John Smith', start: '2024-09-20', end: '2025-01-15', valuation: '$165,000' },
+        { company: 'PepsiCo', location: 'Phoenix Facility', job: 'Interior Office Renovation', contact: 'Sarah Johnson', start: '2024-10-01', end: '2024-12-20', valuation: '$120,000' },
+        
+        // COCA-COLA - Multi-location with different contractors
+        { company: 'Coca-Cola Company', location: 'Atlanta HQ', job: 'Executive Floor Electrical Upgrade', contact: 'David Williams', start: '2024-09-10', end: '2024-12-30', valuation: '$145,000' },
+        { company: 'Coca-Cola Company', location: 'Miami Distribution', job: 'Refrigeration System Replacement', contact: 'Jennifer Taylor', start: '2024-08-20', end: '2024-11-25', valuation: '$185,000' },
+        { company: 'Coca-Cola Company', location: 'Houston Bottling', job: 'Production Line Build-Out', contact: 'Robert Brown', start: '2024-10-05', end: '2025-01-10', valuation: '$225,000' },
+        
+        // MONDELEZ - Multi-location with different contractors
+        { company: 'Mondelez International', location: 'Chicago HQ', job: 'Power Distribution Upgrade', contact: 'Lisa Anderson', start: '2024-09-15', end: '2024-12-15', valuation: '$132,000' },
+        { company: 'Mondelez International', location: 'Philadelphia Plant', job: 'Cooling System Installation', contact: 'James Martinez', start: '2024-10-10', end: '2025-01-15', valuation: '$178,000' },
+        { company: 'Mondelez International', location: 'Portland Facility', job: 'Manufacturing Floor Interior', contact: 'Lisa Anderson', start: '2024-08-25', end: '2024-11-20', valuation: '$145,000' },
+        
+        // GENERAL MILLS - Multi-location with different contractors
+        { company: 'General Mills', location: 'Minneapolis HQ', job: 'Campus Electrical Infrastructure', contact: 'Christopher Moore', start: '2024-09-05', end: '2025-02-01', valuation: '$295,000' },
+        { company: 'General Mills', location: 'Buffalo Plant', job: 'Production Line Electrical Refit', contact: 'Amanda Davis', start: '2024-08-15', end: '2024-12-30', valuation: '$220,000' },
+        { company: 'General Mills', location: 'Kansas City Facility', job: 'Warehouse Interior Construction', contact: 'Daniel Thompson', start: '2024-10-01', end: '2025-01-20', valuation: '$165,000' },
+        
+        // KELLOGG - Multi-location with different contractors  
+        { company: 'Kellogg Company', location: 'Battle Creek HQ', job: 'Building Automation & Electrical', contact: 'Michelle White', start: '2024-09-01', end: '2024-12-10', valuation: '$185,000' },
+        { company: 'Kellogg Company', location: 'Memphis Plant', job: 'Mechanical HVAC Upgrade', contact: 'Kevin Harris', start: '2024-08-10', end: '2024-11-30', valuation: '$195,000' },
+        { company: 'Kellogg Company', location: 'Omaha Facility', job: 'Office Space Build-Out', contact: 'Michelle White', start: '2024-10-15', end: '2025-01-25', valuation: '$135,000' },
+        
+        // MARS - Multi-location with different contractors
+        { company: 'Mars Incorporated', location: 'McLean HQ', job: 'Corporate Office Electrical Remodel', contact: 'Jessica Clark', start: '2024-09-12', end: '2024-12-20', valuation: '$175,000' },
+        { company: 'Mars Incorporated', location: 'Hackettstown Plant', job: 'Plant Floor Mechanical Systems', contact: 'Brian Lewis', start: '2024-08-28', end: '2024-11-15', valuation: '$210,000' },
+        { company: 'Mars Incorporated', location: 'Waco Facility', job: 'Production Area Interior Upgrade', contact: 'Jessica Clark', start: '2024-10-08', end: '2025-01-05', valuation: '$155,000' },
+        
+        // KRAFT HEINZ - Multi-location with different contractors
+        { company: 'Kraft Heinz', location: 'Chicago HQ', job: 'Main Building Electrical Infrastructure', contact: 'Rachel Walker', start: '2024-09-15', end: '2025-02-01', valuation: '$265,000' },
+        { company: 'Kraft Heinz', location: 'Pittsburgh Office', job: 'Regional Office Mechanical Systems', contact: 'Steven Hall', start: '2024-08-20', end: '2024-12-05', valuation: '$145,000' },
+        { company: 'Kraft Heinz', location: 'Ontario Plant', job: 'Manufacturing Floor Build-Out', contact: 'Patricia Young', start: '2024-10-01', end: '2025-01-15', valuation: '$195,000' },
+        { company: 'Kraft Heinz', location: 'Madison Facility', job: 'Warehouse Interior Construction', contact: 'Rachel Walker', start: '2024-09-25', end: '2024-12-30', valuation: '$125,000' },
+        
+        // TYSON FOODS - Multi-location with different contractors
+        { company: 'Tyson Foods', location: 'Springdale HQ', job: 'Corporate Campus Electrical', contact: 'Mark Patterson', start: '2024-09-10', end: '2025-01-20', valuation: '$285,000' },
         { company: 'Tyson Foods', location: 'Dakota City Plant', job: 'Refrigeration System Replacement', contact: 'Emily Rodriguez', start: '2024-09-20', end: '2024-12-20', valuation: '$245,000' },
-        { company: 'Kellogg Company', location: 'Memphis Plant', job: 'Mechanical System Upgrade', contact: 'Kevin Harris', start: '2024-08-01', end: '2024-11-30', valuation: '$190,000' },
-        { company: 'Mondelez International', location: 'Philadelphia Plant', job: 'Interior Build-Out', contact: 'James Martinez', start: '2024-10-10', end: '2025-01-15', valuation: '$155,000' },
-        { company: "Pilgrim's Pride", location: 'Athens Facility', job: 'Electrical Infrastructure Upgrade', contact: 'Richard Coleman', start: '2024-09-05', end: '2024-12-10', valuation: '$135,000' },
-        { company: 'Ocean Spray', location: 'Lakeville HQ', job: 'Office HVAC Replacement', contact: 'Margaret Perry', start: '2024-10-01', end: '2024-12-30', valuation: '$125,000' },
-        { company: 'Dean Foods', location: 'Dallas HQ', job: 'Conference Center Renovation', contact: 'Linda Torres', start: '2024-09-25', end: '2025-01-20', valuation: '$210,000' }
+        { company: 'Tyson Foods', location: 'Temperanceville Plant', job: 'Processing Floor Interior', contact: 'Mark Patterson', start: '2024-08-15', end: '2024-11-25', valuation: '$165,000' },
+        { company: 'Tyson Foods', location: 'Amarillo Facility', job: 'Production Line Electrical Install', contact: 'William Foster', start: '2024-10-05', end: '2025-01-10', valuation: '$175,000' },
+        
+        // SMITHFIELD - Multi-location with different contractors
+        { company: 'Smithfield Foods', location: 'Smithfield HQ', job: 'Headquarters Electrical Modernization', contact: 'Christine Lee', start: '2024-09-18', end: '2024-12-15', valuation: '$155,000' },
+        { company: 'Smithfield Foods', location: 'Tar Heel Plant', job: 'Plant Mechanical System Upgrade', contact: 'Andrew Mitchell', start: '2024-08-25', end: '2024-11-30', valuation: '$215,000' },
+        { company: 'Smithfield Foods', location: 'Sioux Falls Facility', job: 'Warehouse Interior Renovation', contact: 'Christine Lee', start: '2024-10-10', end: '2025-01-05', valuation: '$138,000' },
+        
+        // LAND O LAKES - Multi-location with different contractors
+        { company: 'Land O Lakes', location: 'Arden Hills HQ', job: 'Office Building Electrical Upgrade', contact: 'Susan Bennett', start: '2024-09-08', end: '2024-12-10', valuation: '$125,000' },
+        { company: 'Land O Lakes', location: 'Spencer Plant', job: 'Dairy Processing Mechanical Systems', contact: 'Ronald Gray', start: '2024-08-15', end: '2024-11-20', valuation: '$185,000' },
+        { company: 'Land O Lakes', location: 'Kiel Facility', job: 'Production Floor Interior Build', contact: 'Susan Bennett', start: '2024-10-01', end: '2025-01-15', valuation: '$145,000' },
+        
+        // OCEAN SPRAY - Multi-location with different contractors
+        { company: 'Ocean Spray', location: 'Lakeville HQ', job: 'Corporate Office HVAC & Electrical', contact: 'Margaret Perry', start: '2024-10-01', end: '2024-12-30', valuation: '$125,000' },
+        { company: 'Ocean Spray', location: 'Kenosha Plant', job: 'Production Equipment Electrical', contact: 'George Butler', start: '2024-09-12', end: '2024-12-05', valuation: '$165,000' },
+        { company: 'Ocean Spray', location: 'Bordentown Facility', job: 'Manufacturing Floor Interior', contact: 'Dorothy Russell', start: '2024-08-20', end: '2024-11-15', valuation: '$135,000' }
     ],
     
     // 35 Change Log Entries
@@ -338,7 +385,7 @@ const MockData = {
         { timestamp: '2024-10-12T09:00:00', user: 'Eric Quidort', org: 'Red Door', action: 'Contact Updated', details: 'Updated Christopher Moore last contact date to 2024-10-12' },
         { timestamp: '2024-10-11T14:15:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Activity Logged', details: 'Meeting with Mark Patterson on 2024-10-11' },
         { timestamp: '2024-10-11T11:00:00', user: 'Gianfranco Guercio', org: 'Guercio Energy Group', action: 'Contractor Assignment', details: 'Tyson Foods: Assigned Guercio Energy Group as electrical contractor' },
-        { timestamp: '2024-10-10T16:30:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Project Started', details: 'Mondelez Philadelphia Plant - Interior Build-Out started' },
+        { timestamp: '2024-10-10T16:30:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Project Started', details: 'Mondelez Philadelphia Plant - Cooling System Installation started' },
         { timestamp: '2024-10-10T13:45:00', user: 'Wade Zane', org: 'Stable Works', action: 'Activity Logged', details: 'Site visit at Coca-Cola Miami Distribution' },
         { timestamp: '2024-10-09T10:15:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Gift Added', details: 'Target Gift Card ($75) for Linda Torres' },
         { timestamp: '2024-10-08T15:20:00', user: 'Nick Wagner', org: 'Fritz Staffing', action: 'Contact Updated', details: 'Updated David Williams last contact date to 2024-10-08' },
@@ -347,14 +394,14 @@ const MockData = {
         { timestamp: '2024-10-03T16:45:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Activity Logged', details: 'Email exchange with Diana Murphy on 2024-10-03' },
         { timestamp: '2024-10-02T10:30:00', user: 'Bill Myers', org: 'Myers Industrial Services', action: 'Contact Updated', details: 'Updated Nicole Sanders last contact date to 2024-10-02' },
         { timestamp: '2024-10-01T15:15:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Gift Added', details: 'Premium Coffee Set ($70) for Margaret Perry' },
-        { timestamp: '2024-10-01T09:00:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Project Started', details: 'Ocean Spray Lakeville HQ - Office HVAC Replacement started' },
+        { timestamp: '2024-10-01T09:00:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Project Started', details: 'Ocean Spray Lakeville HQ - Corporate Office HVAC started' },
         { timestamp: '2024-09-30T14:20:00', user: 'Eric Quidort', org: 'Red Door', action: 'Activity Logged', details: 'Marketing consultation with Emily Rodriguez' },
         { timestamp: '2024-09-30T11:00:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Gift Added', details: 'Spa Gift Certificate ($120) for Rachel Walker' },
         { timestamp: '2024-09-29T16:30:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Contact Added', details: 'Added George Butler (george.butler@oceanspray.com) at Ocean Spray' },
         { timestamp: '2024-09-28T13:45:00', user: 'Gianfranco Guercio', org: 'Guercio Energy Group', action: 'Activity Logged', details: 'Site inspection at PepsiCo Dallas Plant' },
         { timestamp: '2024-09-28T10:15:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Gift Added', details: 'Golf Accessories ($95) for Mark Patterson' },
         { timestamp: '2024-09-27T15:00:00', user: 'Wade Zane', org: 'Stable Works', action: 'Contact Updated', details: 'Updated Christine Lee last contact date to 2024-09-27' },
-        { timestamp: '2024-09-25T14:30:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Project Started', details: 'Dean Foods Dallas HQ - Conference Center Renovation started' },
+        { timestamp: '2024-09-25T14:30:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Project Started', details: 'Kraft Heinz Madison - Warehouse Interior Construction started' },
         { timestamp: '2024-09-25T09:45:00', user: 'Bill Myers', org: 'Myers Industrial Services', action: 'Activity Logged', details: 'Mechanical assessment at Kellogg Memphis Plant' },
         { timestamp: '2024-09-22T16:15:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Gift Added', details: 'Wine & Cheese Basket ($85) for Jennifer Taylor' },
         { timestamp: '2024-09-20T13:20:00', user: 'Gianfranco Guercio', org: 'Guercio Energy Group', action: 'Opportunity Created', details: 'New opportunity: Kraft Heinz Madison Facility - $280K' },
@@ -363,8 +410,8 @@ const MockData = {
         { timestamp: '2024-09-15T14:00:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Gift Added', details: 'Luxury Candle Set ($55) for Diana Murphy' },
         { timestamp: '2024-09-15T11:15:00', user: 'Nick Wagner', org: 'Fritz Staffing', action: 'Contact Updated', details: 'Updated William Foster contact information' },
         { timestamp: '2024-09-10T16:45:00', user: 'Ryan Morris', org: 'Triumph Atlantic', action: 'Contractor Assignment', details: 'Ocean Spray: Assigned Guercio Energy Group as electrical contractor' },
-        { timestamp: '2024-09-05T13:30:00', user: 'Wade Zane', org: 'Stable Works', action: 'Project Started', details: "Pilgrim's Pride Athens Facility - Electrical Infrastructure started" },
-        { timestamp: '2024-09-01T09:00:00', user: 'Gianfranco Guercio', org: 'Guercio Energy Group', action: 'Project Started', details: 'PepsiCo Chicago Distribution - Warehouse Lighting started' }
+        { timestamp: '2024-09-05T13:30:00', user: 'Wade Zane', org: 'Stable Works', action: 'Project Started', details: "General Mills Kansas City - Warehouse Interior Construction started" },
+        { timestamp: '2024-09-01T09:00:00', user: 'Gianfranco Guercio', org: 'Guercio Energy Group', action: 'Project Started', details: 'PepsiCo Newark Bottling - Electrical Panel Upgrade started' }
     ]
 };
 
