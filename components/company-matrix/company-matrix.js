@@ -1,6 +1,6 @@
 /**
- * Company Matrix Component
- * Comprehensive view of all companies, their locations, and work status
+ * Enhanced Company Matrix Component
+ * Now includes relationship intelligence and introduction opportunities
  */
 
 const CompanyMatrixComponent = {
@@ -12,13 +12,15 @@ const CompanyMatrixComponent = {
     projects: [],
     opportunities: [],
     currentOrg: null,
+    viewMode: 'cards', // 'cards' or 'excel' or 'relationships'
     filters: {
       search: '',
       showOnlyWorked: false,
       showOnlyUnworked: false,
       tier: ''
     },
-    expandedCompanies: new Set()
+    expandedCompanies: new Set(),
+    relationshipData: []
   },
 
   /**
@@ -37,10 +39,44 @@ const CompanyMatrixComponent = {
       // Setup event listeners
       this.setupEventListeners();
       
+      // Add view mode buttons to the page
+      this.addViewModeButtons();
+      
       console.log('✅ Company Matrix Component initialized');
     } catch (error) {
       console.error('Error initializing Company Matrix Component:', error);
       this.showError();
+    }
+  },
+
+  /**
+   * Add view mode buttons to the UI
+   */
+  addViewModeButtons() {
+    const controlsContainer = document.querySelector('.page-header .page-actions');
+    if (!controlsContainer) return;
+
+    // Check if buttons already exist
+    let viewButtonGroup = document.getElementById('view-mode-buttons');
+    if (!viewButtonGroup) {
+      viewButtonGroup = document.createElement('div');
+      viewButtonGroup.id = 'view-mode-buttons';
+      viewButtonGroup.className = 'btn-group';
+      viewButtonGroup.style.cssText = 'margin-left: auto; display: flex; gap: 4px;';
+      
+      viewButtonGroup.innerHTML = `
+        <button id="view-cards" class="btn btn-sm btn-primary" title="Card View">
+          <span style="font-size: 16px;">▦</span> Cards
+        </button>
+        <button id="view-excel" class="btn btn-sm btn-ghost" title="Excel View">
+          <span style="font-size: 16px;">⊞</span> Excel
+        </button>
+        <button id="view-relationships" class="btn btn-sm btn-ghost" title="Relationship Intelligence">
+          <span style="font-size: 16px;">🤝</span> Relationships
+        </button>
+      `;
+      
+      controlsContainer.appendChild(viewButtonGroup);
     }
   },
 
@@ -62,9 +98,410 @@ const CompanyMatrixComponent = {
     this.state.projects = VisibilityService.filterProjects(projects, companies, this.state.currentOrg);
     this.state.opportunities = VisibilityService.filterOpportunities(opportunities, companies, this.state.currentOrg);
     
-    // Render the matrix
-    this.renderMatrix();
+    // Analyze relationships
+    this.analyzeRelationships();
+    
+    // Render based on view mode
+    this.render();
+  },
+
+  /**
+   * Analyze cross-company relationships and introduction opportunities
+   */
+  analyzeRelationships() {
+    const relationships = [];
+    
+    // Group locations by state
+    const locationsByState = {};
+    this.state.locations.forEach(location => {
+      const state = location.state;
+      if (!locationsByState[state]) {
+        locationsByState[state] = [];
+      }
+      locationsByState[state].push({
+        ...location,
+        company: this.state.companies.find(c => c.normalized === location.company)
+      });
+    });
+    
+    // Find companies with complementary geographic presence
+    this.state.companies.forEach(companyA => {
+      const companyALocations = this.state.locations.filter(l => l.company === companyA.normalized);
+      
+      this.state.companies.forEach(companyB => {
+        if (companyA.normalized >= companyB.normalized) return; // Avoid duplicates
+        
+        const companyBLocations = this.state.locations.filter(l => l.company === companyB.normalized);
+        
+        // Check for complementary coverage
+        const aStates = new Set(companyALocations.map(l => l.state));
+        const bStates = new Set(companyBLocations.map(l => l.state));
+        
+        // Find where A is strong but B is weak
+        const aStrongStates = [];
+        const bStrongStates = [];
+        
+        aStates.forEach(state => {
+          const aCount = companyALocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyA, l)).length;
+          const bCount = companyBLocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyB, l)).length;
+          
+          if (aCount > 0 && bCount === 0) {
+            aStrongStates.push(state);
+          }
+        });
+        
+        bStates.forEach(state => {
+          const bCount = companyBLocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyB, l)).length;
+          const aCount = companyALocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyA, l)).length;
+          
+          if (bCount > 0 && aCount === 0) {
+            bStrongStates.push(state);
+          }
+        });
+        
+        // If there's complementary coverage, create a relationship
+        if (aStrongStates.length > 0 && bStrongStates.length > 0) {
+          relationships.push({
+            companyA: companyA.name,
+            companyB: companyB.name,
+            aStrength: aStrongStates,
+            bStrength: bStrongStates,
+            potentialValue: this.calculateRelationshipValue(companyA, companyB, aStrongStates, bStrongStates),
+            type: 'Geographic Complementarity'
+          });
+        }
+        
+        // Check for same-state different-city opportunities
+        const sharedStates = Array.from(aStates).filter(s => bStates.has(s));
+        sharedStates.forEach(state => {
+          const aCities = new Set(companyALocations.filter(l => l.state === state).map(l => l.city));
+          const bCities = new Set(companyBLocations.filter(l => l.state === state).map(l => l.city));
+          
+          const aOnlyCities = Array.from(aCities).filter(c => !bCities.has(c));
+          const bOnlyCities = Array.from(bCities).filter(c => !aCities.has(c));
+          
+          if (aOnlyCities.length > 0 && bOnlyCities.length > 0) {
+            relationships.push({
+              companyA: companyA.name,
+              companyB: companyB.name,
+              aStrength: aOnlyCities.map(c => `${c}, ${state}`),
+              bStrength: bOnlyCities.map(c => `${c}, ${state}`),
+              potentialValue: this.calculateRelationshipValue(companyA, companyB, aOnlyCities, bOnlyCities),
+              type: 'Same State Coverage'
+            });
+          }
+        });
+      });
+    });
+    
+    this.state.relationshipData = relationships.sort((a, b) => b.potentialValue - a.potentialValue);
+  },
+
+  /**
+   * Calculate potential value of a relationship
+   */
+  calculateRelationshipValue(companyA, companyB, aStrength, bStrength) {
+    // Simple scoring: tier value * number of complementary locations
+    const tierValues = { 'Enterprise': 100, 'Large': 75, 'Mid': 50, 'Small': 25 };
+    const aValue = tierValues[companyA.tier] || 25;
+    const bValue = tierValues[companyB.tier] || 25;
+    
+    return (aValue + bValue) * (aStrength.length + bStrength.length);
+  },
+
+  /**
+   * Main render function
+   */
+  render() {
+    switch(this.state.viewMode) {
+      case 'excel':
+        this.renderExcelView();
+        break;
+      case 'relationships':
+        this.renderRelationshipView();
+        break;
+      default:
+        this.renderMatrix();
+    }
     this.renderStatistics();
+  },
+
+  /**
+   * Render Excel-like grid view
+   */
+  renderExcelView() {
+    const container = document.getElementById('company-matrix-container');
+    if (!container) return;
+    
+    // Get unique states
+    const states = [...new Set(this.state.locations.map(l => l.state))].sort();
+    
+    // Build Excel grid
+    let html = `
+      <div style="overflow-x: auto; max-height: 70vh;">
+        <table class="excel-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead style="position: sticky; top: 0; background: var(--background-alt); z-index: 10;">
+            <tr>
+              <th style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 0; background: var(--background-alt); z-index: 11;">Company</th>
+              <th style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 120px; background: var(--background-alt); z-index: 11;">Tier</th>
+              ${states.map(state => `
+                <th style="border: 1px solid var(--border-color); padding: 8px; min-width: 100px; text-align: center;">
+                  ${state}
+                </th>
+              `).join('')}
+              <th style="border: 1px solid var(--border-color); padding: 8px; background: var(--success-bg); text-align: center;">Total Worked</th>
+              <th style="border: 1px solid var(--border-color); padding: 8px; background: var(--warning-bg); text-align: center;">Opportunities</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    // Add rows for each company
+    this.state.companies.forEach(company => {
+      const companyLocations = this.state.locations.filter(l => l.company === company.normalized);
+      let totalWorked = 0;
+      let totalOpportunities = 0;
+      
+      html += `
+        <tr>
+          <td style="border: 1px solid var(--border-color); padding: 8px; font-weight: 600; position: sticky; left: 0; background: var(--background);">
+            ${company.name}
+          </td>
+          <td style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 120px; background: var(--background);">
+            <span class="badge badge-secondary">${company.tier}</span>
+          </td>
+      `;
+      
+      // Add cells for each state
+      states.forEach(state => {
+        const stateLocations = companyLocations.filter(l => l.state === state);
+        const workedCount = stateLocations.filter(l => this.hasWorkedAtLocation(company, l)).length;
+        const totalCount = stateLocations.length;
+        
+        if (workedCount > 0) totalWorked += workedCount;
+        if (totalCount - workedCount > 0) totalOpportunities += totalCount - workedCount;
+        
+        let cellContent = '';
+        let cellStyle = 'border: 1px solid var(--border-color); padding: 8px; text-align: center;';
+        
+        if (totalCount === 0) {
+          cellContent = '—';
+          cellStyle += ' color: var(--text-muted);';
+        } else if (workedCount === totalCount) {
+          cellContent = `✓ ${workedCount}`;
+          cellStyle += ' background: rgba(16, 185, 129, 0.1); color: var(--success-color); font-weight: 600;';
+        } else if (workedCount > 0) {
+          cellContent = `${workedCount}/${totalCount}`;
+          cellStyle += ' background: rgba(245, 158, 11, 0.1); color: var(--warning-color);';
+        } else {
+          cellContent = `○ ${totalCount}`;
+          cellStyle += ' color: var(--text-secondary);';
+        }
+        
+        html += `<td style="${cellStyle}" title="${stateLocations.map(l => l.city).join(', ')}">${cellContent}</td>`;
+      });
+      
+      // Add totals
+      html += `
+        <td style="border: 1px solid var(--border-color); padding: 8px; text-align: center; background: rgba(16, 185, 129, 0.05); font-weight: 600; color: var(--success-color);">
+          ${totalWorked}
+        </td>
+        <td style="border: 1px solid var(--border-color); padding: 8px; text-align: center; background: rgba(245, 158, 11, 0.05); font-weight: 600; color: var(--warning-color);">
+          ${totalOpportunities}
+        </td>
+      </tr>
+      `;
+    });
+    
+    html += `
+          </tbody>
+        </table>
+      </div>
+      
+      <div style="margin-top: 20px; padding: 16px; background: var(--background-alt); border-radius: 8px;">
+        <h4 style="margin-top: 0; margin-bottom: 12px;">Legend</h4>
+        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+          <div><span style="color: var(--success-color); font-weight: 600;">✓ N</span> = All locations worked (N total)</div>
+          <div><span style="color: var(--warning-color);">N/M</span> = Partial coverage (N worked of M total)</div>
+          <div><span style="color: var(--text-secondary);">○ N</span> = No work yet (N opportunities)</div>
+          <div><span style="color: var(--text-muted);">—</span> = No locations in state</div>
+        </div>
+      </div>
+    `;
+    
+    container.innerHTML = html;
+  },
+
+  /**
+   * Render Relationship Intelligence View
+   */
+  renderRelationshipView() {
+    const container = document.getElementById('company-matrix-container');
+    if (!container) return;
+    
+    if (this.state.relationshipData.length === 0) {
+      container.innerHTML = '<div class="table-empty">No cross-company introduction opportunities found</div>';
+      return;
+    }
+    
+    let html = `
+      <div class="relationship-header" style="margin-bottom: 24px;">
+        <h3 style="margin: 0; margin-bottom: 8px;">🤝 Introduction Opportunities</h3>
+        <p style="color: var(--text-secondary); margin: 0;">
+          These companies have complementary geographic coverage and could benefit from introductions
+        </p>
+      </div>
+      
+      <div class="relationship-grid" style="display: grid; gap: 16px;">
+    `;
+    
+    // Show top relationships
+    this.state.relationshipData.slice(0, 10).forEach((rel, index) => {
+      const companyA = this.state.companies.find(c => c.name === rel.companyA);
+      const companyB = this.state.companies.find(c => c.name === rel.companyB);
+      
+      html += `
+        <div class="relationship-card card" style="padding: 20px; border-left: 4px solid var(--primary-color);">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--primary-color); opacity: 0.3;">
+                #${index + 1}
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 18px;">
+                  ${rel.companyA} ↔ ${rel.companyB}
+                </h4>
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                  <span class="badge badge-secondary">${companyA?.tier}</span>
+                  <span class="badge badge-secondary">${companyB?.tier}</span>
+                  <span class="badge badge-primary">${rel.type}</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Potential Score</div>
+              <div style="font-size: 24px; font-weight: bold; color: var(--primary-color);">
+                ${rel.potentialValue}
+              </div>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="padding: 12px; background: rgba(16, 185, 129, 0.05); border-radius: 8px;">
+              <div style="font-weight: 600; margin-bottom: 8px; color: var(--success-color);">
+                ${rel.companyA} knows:
+              </div>
+              <div style="font-size: 13px; line-height: 1.6;">
+                ${rel.aStrength.map(s => `<div>• ${s}</div>`).join('')}
+              </div>
+            </div>
+            
+            <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-radius: 8px;">
+              <div style="font-weight: 600; margin-bottom: 8px; color: var(--primary-color);">
+                ${rel.companyB} knows:
+              </div>
+              <div style="font-size: 13px; line-height: 1.6;">
+                ${rel.bStrength.map(s => `<div>• ${s}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-top: 16px; padding: 12px; background: var(--background-alt); border-radius: 6px;">
+            <div style="font-size: 13px; color: var(--text-secondary);">
+              <strong>💡 Opportunity:</strong> 
+              ${rel.companyA} could introduce ${rel.companyB} to their contacts in 
+              <strong>${rel.aStrength.join(', ')}</strong>, 
+              while ${rel.companyB} could reciprocate with introductions in 
+              <strong>${rel.bStrength.join(', ')}</strong>.
+            </div>
+          </div>
+          
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button class="btn btn-sm btn-primary" onclick="CompanyMatrixComponent.createIntroduction('${rel.companyA}', '${rel.companyB}')">
+              📧 Draft Introduction Email
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="CompanyMatrixComponent.viewRelationshipDetails('${rel.companyA}', '${rel.companyB}')">
+              View Details
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    
+    html += '</div>';
+    
+    container.innerHTML = html;
+  },
+
+  /**
+   * Create introduction email draft
+   */
+  createIntroduction(companyA, companyB) {
+    const rel = this.state.relationshipData.find(r => 
+      (r.companyA === companyA && r.companyB === companyB) ||
+      (r.companyA === companyB && r.companyB === companyA)
+    );
+    
+    if (!rel) {
+      alert('Relationship data not found');
+      return;
+    }
+    
+    // Create email template
+    const emailTemplate = `
+Subject: Introduction: ${companyA} ↔ ${companyB}
+
+Dear [Contact Name],
+
+I wanted to introduce you to [Other Contact Name] from ${rel.companyA === companyA ? companyB : companyA}.
+
+${companyA} has strong presence in ${rel.companyA === companyA ? rel.aStrength.join(', ') : rel.bStrength.join(', ')}, while ${companyB} has established operations in ${rel.companyB === companyB ? rel.bStrength.join(', ') : rel.aStrength.join(', ')}.
+
+I believe there could be valuable synergies between your organizations, particularly in terms of geographic coverage and potential collaboration opportunities.
+
+Would you both be interested in a brief introductory call to explore potential areas of mutual benefit?
+
+Best regards,
+[Your Name]
+    `.trim();
+    
+    // In production, this would open an email composer
+    alert('Email Template:\n\n' + emailTemplate);
+  },
+
+  /**
+   * View detailed relationship analysis
+   */
+  viewRelationshipDetails(companyA, companyB) {
+    const rel = this.state.relationshipData.find(r => 
+      (r.companyA === companyA && r.companyB === companyB) ||
+      (r.companyA === companyB && r.companyB === companyA)
+    );
+    
+    if (!rel) {
+      alert('Relationship data not found');
+      return;
+    }
+    
+    // Show detailed analysis
+    alert(`
+Relationship Analysis: ${companyA} ↔ ${companyB}
+
+Type: ${rel.type}
+Potential Value Score: ${rel.potentialValue}
+
+${companyA} Coverage:
+${rel.companyA === companyA ? rel.aStrength.map(s => '• ' + s).join('\n') : rel.bStrength.map(s => '• ' + s).join('\n')}
+
+${companyB} Coverage:
+${rel.companyB === companyB ? rel.bStrength.map(s => '• ' + s).join('\n') : rel.aStrength.map(s => '• ' + s).join('\n')}
+
+This relationship offers strong potential for:
+• Geographic expansion opportunities
+• Cross-referral partnerships
+• Knowledge sharing
+• Joint business development
+    `.trim());
   },
 
   /**
@@ -218,7 +655,7 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Render the company matrix
+   * Render the company matrix (Cards View)
    */
   renderMatrix() {
     const container = document.getElementById('company-matrix-container');
@@ -674,7 +1111,7 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Setup event listeners
+   * Enhanced setup event listeners
    */
   setupEventListeners() {
     // Search input
@@ -682,8 +1119,51 @@ const CompanyMatrixComponent = {
     if (searchInput) {
       searchInput.addEventListener('input', Utils.debounce((e) => {
         this.state.filters.search = e.target.value.toLowerCase();
-        this.renderMatrix();
+        this.render();
       }, 300));
+    }
+    
+    // View mode buttons
+    const viewCardsBtn = document.getElementById('view-cards');
+    if (viewCardsBtn) {
+      viewCardsBtn.addEventListener('click', () => {
+        this.state.viewMode = 'cards';
+        document.querySelectorAll('#view-mode-buttons button').forEach(btn => {
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-ghost');
+        });
+        viewCardsBtn.classList.remove('btn-ghost');
+        viewCardsBtn.classList.add('btn-primary');
+        this.render();
+      });
+    }
+    
+    const viewExcelBtn = document.getElementById('view-excel');
+    if (viewExcelBtn) {
+      viewExcelBtn.addEventListener('click', () => {
+        this.state.viewMode = 'excel';
+        document.querySelectorAll('#view-mode-buttons button').forEach(btn => {
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-ghost');
+        });
+        viewExcelBtn.classList.remove('btn-ghost');
+        viewExcelBtn.classList.add('btn-primary');
+        this.render();
+      });
+    }
+    
+    const viewRelationshipsBtn = document.getElementById('view-relationships');
+    if (viewRelationshipsBtn) {
+      viewRelationshipsBtn.addEventListener('click', () => {
+        this.state.viewMode = 'relationships';
+        document.querySelectorAll('#view-mode-buttons button').forEach(btn => {
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-ghost');
+        });
+        viewRelationshipsBtn.classList.remove('btn-ghost');
+        viewRelationshipsBtn.classList.add('btn-primary');
+        this.render();
+      });
     }
     
     // Filter buttons
@@ -703,7 +1183,7 @@ const CompanyMatrixComponent = {
           unworkedBtn.textContent = 'Show Opportunities Only';
         }
         
-        this.renderMatrix();
+        this.render();
       });
     }
     
@@ -723,7 +1203,7 @@ const CompanyMatrixComponent = {
           workedBtn.textContent = 'Show Worked Only';
         }
         
-        this.renderMatrix();
+        this.render();
       });
     }
     
@@ -732,7 +1212,7 @@ const CompanyMatrixComponent = {
     if (tierFilter) {
       tierFilter.addEventListener('change', (e) => {
         this.state.filters.tier = e.target.value;
-        this.renderMatrix();
+        this.render();
       });
     }
     
@@ -743,7 +1223,7 @@ const CompanyMatrixComponent = {
         this.state.companies.forEach(c => {
           this.state.expandedCompanies.add(c.normalized);
         });
-        this.renderMatrix();
+        this.render();
       });
     }
     
@@ -751,7 +1231,7 @@ const CompanyMatrixComponent = {
     if (collapseAllBtn) {
       collapseAllBtn.addEventListener('click', () => {
         this.state.expandedCompanies.clear();
-        this.renderMatrix();
+        this.render();
       });
     }
   },
@@ -778,4 +1258,4 @@ const CompanyMatrixComponent = {
 // Make available globally
 window.CompanyMatrixComponent = CompanyMatrixComponent;
 
-console.log('📊 Company Matrix Component loaded');
+console.log('📊 Enhanced Company Matrix Component loaded');
