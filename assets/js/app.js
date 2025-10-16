@@ -241,7 +241,8 @@ const App = {
             'contacts',
             'referrals',
             'opportunities',
-            'projects'
+            'projects',
+            'company-matrix'  // Added hyphenated component
         ];
 
         for (const name of componentNames) {
@@ -359,15 +360,19 @@ const App = {
 
     // Load component for specific page
     async loadPageComponent(pageName) {
-        // Check if component class exists
-        const componentClassName = this.capitalize(pageName) + 'Component';
+        // Handle hyphenated page names (e.g., "company-matrix" -> "CompanyMatrixComponent")
+        const componentClassName = pageName
+            .split('-')
+            .map(word => this.capitalize(word))
+            .join('') + 'Component';
+        
         const ComponentClass = window[componentClassName];
         
         if (ComponentClass && ComponentClass.init) {
             console.log(`🎯 Initializing ${componentClassName}...`);
             await ComponentClass.init();
         } else {
-            console.log(`⚠️ No component found for ${pageName}`);
+            console.log(`⚠️ No component found for ${pageName} (${componentClassName})`);
         }
     },
 
@@ -642,26 +647,6 @@ const App = {
         }).format(amount);
     }
 };
-
-/**
-   * Load component for specific page
-   */
-  async loadPageComponent(pageName) {
-    // Handle hyphenated page names (e.g., "company-matrix" -> "CompanyMatrixComponent")
-    const componentClassName = pageName
-      .split('-')
-      .map(word => this.capitalize(word))
-      .join('') + 'Component';
-    
-    const ComponentClass = window[componentClassName];
-    
-    if (ComponentClass && ComponentClass.init) {
-      console.log(`🎯 Initializing ${componentClassName}...`);
-      await ComponentClass.init();
-    } else {
-      console.log(`⚠️ No component found for ${pageName} (${componentClassName})`);
-    }
-  },
 
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
