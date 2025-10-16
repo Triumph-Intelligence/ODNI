@@ -643,6 +643,26 @@ const App = {
     }
 };
 
+/**
+   * Load component for specific page
+   */
+  async loadPageComponent(pageName) {
+    // Handle hyphenated page names (e.g., "company-matrix" -> "CompanyMatrixComponent")
+    const componentClassName = pageName
+      .split('-')
+      .map(word => this.capitalize(word))
+      .join('') + 'Component';
+    
+    const ComponentClass = window[componentClassName];
+    
+    if (ComponentClass && ComponentClass.init) {
+      console.log(`🎯 Initializing ${componentClassName}...`);
+      await ComponentClass.init();
+    } else {
+      console.log(`⚠️ No component found for ${pageName} (${componentClassName})`);
+    }
+  },
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => App.init());
