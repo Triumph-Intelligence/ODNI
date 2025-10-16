@@ -1,7 +1,11 @@
 /**
- * Enhanced Dashboard Component with Interactive US Map
+ * Enhanced Dashboard Component with Interactive US Map (v2)
  * Complete replacement for components/dashboard.js
- * Combines KPIs, interactive map, and activity tracking
+ * - Auto-loads all companies from MockData if DataService is empty/missing fields
+ * - Includes all contractors (Guercio, KMP, Red Door, Byers, Fritz, Stable Works, Myers)
+ * - True filtering by contractor + company search
+ * - Toggleable connection arcs + state density bubbles
+ * - Much better tooltips and reliable zoom/pan behavior
  */
 
 const DashboardComponent = {
@@ -25,10 +29,13 @@ const DashboardComponent = {
     dragStartY: 0,
     hoveredLocation: null,
     searchTerm: '',
-    currentOrg: null
+    currentOrg: null,
+    showConnections: true,
+    showStateLabels: true,
+    showStateDensity: true, // NEW: toggle state density “bubbles”
   },
 
-  // US State coordinates (centroids for detailed map)
+  // US State coordinates (centroids)
   stateCoords: {
     'AL': { x: 730, y: 430, name: 'Alabama' },
     'AK': { x: 150, y: 550, name: 'Alaska' },
@@ -82,7 +89,7 @@ const DashboardComponent = {
     'WY': { x: 380, y: 240, name: 'Wyoming' }
   },
 
-  // Contractor colors
+  // Contractor colors (includes all you asked for)
   contractorColors: {
     'Guercio Energy Group': '#6366f1',
     'Myers Industrial Services': '#ec4899',
@@ -104,34 +111,73 @@ const DashboardComponent = {
   },
 
   /**
-   * Load all required data
+   * Load data (with MockData fallback/merge)
    */
   async loadData() {
-    // Get current org
-    this.state.currentOrg = VisibilityService.getCurrentOrg();
-    
-    // Get all data from cache
-    const companies = await DataService.getCompanies();
-    const contacts = await DataService.getContacts();
-    const gifts = await DataService.getGifts();
-    const referrals = await DataService.getReferrals();
-    const opportunities = await DataService.getOpportunities();
-    const projects = await DataService.getProjects();
-    const changeLog = await DataService.getChangeLog();
-    const locations = await DataService.getLocations();
+    // current org (optional filter)
+    this.state.currentOrg = (window.VisibilityService?.getCurrentOrg?.() ?? null);
 
-    // Filter data using VisibilityService methods
-    this.state.companies = VisibilityService.filterCompanies(companies, this.state.currentOrg);
-    this.state.contacts = VisibilityService.filterContacts(contacts, companies, this.state.currentOrg);
-    this.state.gifts = VisibilityService.filterGifts(gifts, contacts, companies, this.state.currentOrg);
-    this.state.referrals = VisibilityService.filterReferrals(referrals, contacts, companies, this.state.currentOrg);
-    this.state.opportunities = VisibilityService.filterOpportunities(opportunities, companies, this.state.currentOrg);
-    this.state.projects = VisibilityService.filterProjects(projects, companies, this.state.currentOrg);
-    this.state.changeLog = VisibilityService.filterChangeLog(changeLog, this.state.currentOrg);
-    this.state.locations = VisibilityService.filterLocations(locations, companies, this.state.currentOrg);
-    
+    // try cache/services
+    const [
+      companiesDS = [],
+      contactsDS = [],
+      giftsDS = [],
+      referralsDS = [],
+      opportunitiesDS = [],
+      projectsDS = [],
+      changeLogDS = [],
+      locationsDS = []
+    ] = await Promise.all([
+      window.DataService?.getCompanies?.(),
+      window.DataService?.getContacts?.(),
+      window.DataService?.getGifts?.(),
+      window.DataService?.getReferrals?.(),
+      window.DataService?.getOpportunities?.(),
+      window.DataService?.getProjects?.(),
+      window.DataService?.getChangeLog?.(),
+      window.DataService?.getLocations?.()
+    ]);
+
+    // merge with MockData if present (ensures “include all companies with mock data”)
+    const MD = window.MockData || {};
+    const companies = this._mergeUniqueBy(companiesDS || [], MD.companies || [], 'normalized');
+    const contacts = this._mergeUniqueBy(contactsDS || [], MD.contacts || [], 'email');
+    const gifts = this._mergeUniqueBy(giftsDS || [], MD.gifts || [], (g) => `${g.contact_email}|${g.date}|${g.description}`);
+    const referrals = this._mergeUniqueBy(referralsDS || [], MD.referrals || [], (r) => `${r.referred_name}|${r.company}|${r.followup_date}`);
+    const opportunities = this._mergeUniqueBy(opportunitiesDS || [], MD.opportunities || [], (o) => `${o.company}|${o.location}|${o.job}`);
+    const projects = this._mergeUniqueBy(projectsDS || [], MD.projects || [], (p) => p.project_code || `${p.company}|${p.location}|${p.job}|${p.performed_on}`);
+    const changeLog = this._mergeUniqueBy(changeLogDS || [], MD.changeLog || [], 'timestamp');
+    const locations = this._mergeUniqueBy(locationsDS || [], MD.locations || [], (l) => `${l.company}|${l.name}`);
+
+    // optional org visibility filters (no-op if service not present)
+    const V = window.VisibilityService || {};
+    this.state.companies   = (V.filterCompanies?.(companies, this.state.currentOrg) ?? companies);
+    this.state.contacts    = (V.filterContacts?.(contacts, companies, this.state.currentOrg) ?? contacts);
+    this.state.gifts       = (V.filterGifts?.(gifts, contacts, companies, this.state.currentOrg) ?? gifts);
+    this.state.referrals   = (V.filterReferrals?.(referrals, contacts, companies, this.state.currentOrg) ?? referrals);
+    this.state.opportunities = (V.filterOpportunities?.(opportunities, companies, this.state.currentOrg) ?? opportunities);
+    this.state.projects    = (V.filterProjects?.(projects, companies, this.state.currentOrg) ?? projects);
+    this.state.changeLog   = (V.filterChangeLog?.(changeLog, this.state.currentOrg) ?? changeLog);
+    this.state.locations   = (V.filterLocations?.(locations, companies, this.state.currentOrg) ?? locations);
+
     // Select all companies by default
+    this.state.selectedCompanies.clear();
     this.state.companies.forEach(c => this.state.selectedCompanies.add(c.name));
+
+    // Select ALL contractors by default (includes Guercio, KMP, Red Door, Byers, Fritz, Stable Works, Myers)
+    this.state.selectedContractors = new Set(this.getUniqueContractors());
+  },
+
+  // helper: merge arrays by key or key-fn
+  _mergeUniqueBy(a, b, keyOrFn) {
+    const keyFn = typeof keyOrFn === 'function' ? keyOrFn : (x) => x?.[keyOrFn];
+    const map = new Map();
+    for (const item of [...a, ...b]) {
+      const k = keyFn(item);
+      if (k == null) continue;
+      if (!map.has(k)) map.set(k, item);
+    }
+    return [...map.values()];
   },
 
   /**
@@ -169,7 +215,6 @@ const DashboardComponent = {
         </div>
       </div>
     `;
-    
     const statsContainer = document.getElementById('dashboard-stats');
     if (statsContainer) statsContainer.innerHTML = statsHTML;
   },
@@ -180,6 +225,9 @@ const DashboardComponent = {
   renderMap() {
     const mapContainer = document.getElementById('us-map-container');
     if (!mapContainer) return;
+
+    // Preserve current transform across re-renders
+    const { zoomLevel, panX, panY } = this.state;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.id = 'us-map-svg';
@@ -193,13 +241,20 @@ const DashboardComponent = {
     // Create main group for zoom/pan
     const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     mainGroup.id = 'map-main-group';
-    
-    // Draw states
+
+    // Draw states (grid points + labels)
     this.drawStates(mainGroup);
-    
-    // Draw connections between locations
-    this.drawConnections(mainGroup);
-    
+
+    // State density bubbles (toggle)
+    if (this.state.showStateDensity) {
+      this.drawStateDensity(mainGroup);
+    }
+
+    // Draw connections between locations (toggle)
+    if (this.state.showConnections) {
+      this.drawConnections(mainGroup);
+    }
+
     // Draw location markers
     this.drawLocations(mainGroup);
 
@@ -207,12 +262,15 @@ const DashboardComponent = {
     mapContainer.innerHTML = '';
     mapContainer.appendChild(svg);
 
-    // Apply current zoom and pan
+    // Restore transform
+    this.state.zoomLevel = zoomLevel;
+    this.state.panX = panX;
+    this.state.panY = panY;
     this.updateTransform();
   },
 
   /**
-   * Draw US states
+   * Draw US states (centroid dots + labels)
    */
   drawStates(container) {
     const statesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -220,17 +278,19 @@ const DashboardComponent = {
 
     Object.entries(this.stateCoords).forEach(([stateCode, coords]) => {
       const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      
-      // State circle/region
+
+      // Base circle
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', coords.x);
       circle.setAttribute('cy', coords.y);
-      circle.setAttribute('r', '20');
-      circle.setAttribute('fill', 'rgba(226, 232, 240, 0.3)');
+      circle.setAttribute('r', '18');
+      circle.setAttribute('fill', 'rgba(226, 232, 240, 0.25)');
       circle.setAttribute('stroke', '#cbd5e1');
       circle.setAttribute('stroke-width', '1');
-      
-      // State label
+
+      group.appendChild(circle);
+
+      // State label (toggle visibility)
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', coords.x);
       text.setAttribute('y', coords.y + 5);
@@ -239,15 +299,15 @@ const DashboardComponent = {
       text.setAttribute('font-weight', '600');
       text.setAttribute('fill', '#64748b');
       text.textContent = stateCode;
-      
-      group.appendChild(circle);
+      text.style.display = this.state.showStateLabels ? 'block' : 'none';
+
       group.appendChild(text);
-      
-      // Tooltip
+
+      // Tooltip (native)
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
       title.textContent = coords.name;
       group.appendChild(title);
-      
+
       statesGroup.appendChild(group);
     });
 
@@ -255,74 +315,122 @@ const DashboardComponent = {
   },
 
   /**
-   * Draw connections between locations of same company served by different contractors
+   * Draw state density bubbles sized by number of filtered locations
+   */
+  drawStateDensity(container) {
+    const densityGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    densityGroup.id = 'state-density-group';
+
+    // Count filtered locations per state
+    const counts = {};
+    const filteredLocs = this._getFilteredLocationsForMap();
+    filteredLocs.forEach(loc => {
+      counts[loc.state] = (counts[loc.state] ?? 0) + 1;
+    });
+
+    // scale radius: 0 -> 0, max -> ~24
+    const values = Object.values(counts);
+    const max = values.length ? Math.max(...values) : 0;
+
+    Object.entries(this.stateCoords).forEach(([stateCode, coords]) => {
+      const count = counts[stateCode] ?? 0;
+      if (!count) return;
+
+      const r = 6 + (max ? Math.round((count / max) * 18) : 0);
+
+      const bubble = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      bubble.setAttribute('cx', coords.x);
+      bubble.setAttribute('cy', coords.y);
+      bubble.setAttribute('r', String(r));
+      bubble.setAttribute('fill', 'rgba(99,102,241,0.12)'); // soft indigo
+      bubble.setAttribute('stroke', '#6366f1');
+      bubble.setAttribute('stroke-width', '1');
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', coords.x);
+      label.setAttribute('y', coords.y - r - 4);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('font-size', '10');
+      label.setAttribute('font-weight', '700');
+      label.setAttribute('fill', '#475569');
+      label.textContent = count;
+
+      densityGroup.appendChild(bubble);
+      densityGroup.appendChild(label);
+    });
+
+    container.appendChild(densityGroup);
+  },
+
+  /**
+   * Draw connections between locations for the same company
+   * - Only draws paths for visible companies and filtered contractors
+   * - Color attempts: if both endpoints share at least one contractor, use that color; else neutral
    */
   drawConnections(container) {
     const connectionsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     connectionsGroup.id = 'connections-group';
 
-    // Group locations by company
+    // Group locations by company (filtered)
     const locationsByCompany = new Map();
-    this.state.locations.forEach(loc => {
+    const filteredLocs = this._getFilteredLocationsForMap();
+
+    filteredLocs.forEach(loc => {
       const company = this.state.companies.find(c => c.normalized === loc.company);
       if (!company || !this.state.selectedCompanies.has(company.name)) return;
-      
-      if (!locationsByCompany.has(company.name)) {
-        locationsByCompany.set(company.name, []);
-      }
+
+      if (!locationsByCompany.has(company.name)) locationsByCompany.set(company.name, []);
       locationsByCompany.get(company.name).push(loc);
     });
 
-    // Draw connections for each company
-    locationsByCompany.forEach((locations, companyName) => {
+    // Draw curves
+    locationsByCompany.forEach((locations) => {
       if (locations.length < 2) return;
 
-      // Find which contractors serve this company
+      // build contractor set by location based on filtered projects
       const contractorsByLocation = new Map();
       locations.forEach(loc => {
-        const projects = this.state.projects.filter(p => 
-          p.company === companyName && p.location === loc.name
-        );
-        
-        const contractors = new Set();
-        projects.forEach(p => {
-          const contractor = p.performed_by || p.contractor;
-          if (contractor) contractors.add(contractor);
-        });
-        
+        const contractors = this._contractorsForCompanyLocation(loc);
         contractorsByLocation.set(loc.name, contractors);
       });
 
-      // Draw lines between locations
       for (let i = 0; i < locations.length; i++) {
         for (let j = i + 1; j < locations.length; j++) {
           const loc1 = locations[i];
           const loc2 = locations[j];
-          
           const coord1 = this.getLocationCoords(loc1);
           const coord2 = this.getLocationCoords(loc2);
-          
           if (!coord1 || !coord2) continue;
 
-          // Create curved path
+          const set1 = contractorsByLocation.get(loc1.name) || new Set();
+          const set2 = contractorsByLocation.get(loc2.name) || new Set();
+          const shared = [...set1].filter(s => set2.has(s));
+          const color = shared.length ? (this.contractorColors[shared[0]] || '#94a3b8') : '#cbd5e1';
+
+          // curvature
           const midX = (coord1.x + coord2.x) / 2;
           const midY = (coord1.y + coord2.y) / 2;
           const dx = coord2.x - coord1.x;
           const dy = coord2.y - coord1.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          const curve = dist * 0.2;
-          
+          const curve = dist * 0.19;
+
           const controlX = midX - dy / dist * curve;
           const controlY = midY + dx / dist * curve;
 
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${coord1.x} ${coord1.y} Q ${controlX} ${controlY} ${coord2.x} ${coord2.y}`);
           path.setAttribute('fill', 'none');
-          path.setAttribute('stroke', '#cbd5e1');
-          path.setAttribute('stroke-width', '2');
-          path.setAttribute('stroke-dasharray', '5,5');
-          path.setAttribute('opacity', '0.4');
-          
+          path.setAttribute('stroke', color);
+          path.setAttribute('stroke-width', '2.5');
+          path.setAttribute('stroke-dasharray', shared.length ? '0' : '6,6');
+          path.setAttribute('opacity', shared.length ? '0.8' : '0.35');
+          path.style.transition = 'opacity .15s ease';
+
+          // hover highlight
+          path.addEventListener('mouseenter', () => path.setAttribute('opacity', '1'));
+          path.addEventListener('mouseleave', () => path.setAttribute('opacity', shared.length ? '0.8' : '0.35'));
+
           connectionsGroup.appendChild(path);
         }
       }
@@ -332,84 +440,85 @@ const DashboardComponent = {
   },
 
   /**
-   * Draw location markers
+   * Draw location markers (filtered by contractors & selected companies)
    */
   drawLocations(container) {
     const locationsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     locationsGroup.id = 'locations-group';
 
-    this.state.locations.forEach(location => {
+    const filteredLocs = this._getFilteredLocationsForMap();
+
+    filteredLocs.forEach(location => {
       const company = this.state.companies.find(c => c.normalized === location.company);
       if (!company || !this.state.selectedCompanies.has(company.name)) return;
 
       const coords = this.getLocationCoords(location);
       if (!coords) return;
 
-      // Find contractor for this location
-      const projects = this.state.projects.filter(p => 
-        p.company === company.name && p.location === location.name
-      );
-      
-      const contractors = new Set();
-      projects.forEach(p => {
-        const contractor = p.performed_by || p.contractor;
-        if (contractor) contractors.add(contractor);
-      });
+      const contractors = this._contractorsForCompanyLocation(location);
+      if (!this._anyContractorSelected(contractors)) return;
 
-      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      group.style.cursor = 'pointer';
-      group.dataset.company = company.name;
-      group.dataset.location = location.name;
+      const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      node.style.cursor = 'pointer';
+      node.dataset.company = company.name;
+      node.dataset.location = location.name;
 
-      // Location pin
+      // Location pin group (with its own translate only)
       const pin = this.createLocationPin(coords.x, coords.y, contractors, company);
-      group.appendChild(pin);
+      node.appendChild(pin);
 
-      // Add hover effects
-      group.addEventListener('mouseenter', () => {
+      // Hover / Tooltip
+      node.addEventListener('mouseenter', () => {
         this.showLocationTooltip(company, location, contractors);
-        pin.setAttribute('transform', `scale(1.2) translate(${coords.x * -0.1}, ${coords.y * -0.1})`);
+        // keep translate and add scale
+        const baseTransform = `translate(${coords.x}, ${coords.y})`;
+        pin.setAttribute('transform', `${baseTransform} scale(1.2)`);
       });
 
-      group.addEventListener('mouseleave', () => {
+      node.addEventListener('mouseleave', () => {
         this.hideLocationTooltip();
-        pin.setAttribute('transform', 'scale(1)');
+        const baseTransform = `translate(${coords.x}, ${coords.y})`;
+        pin.setAttribute('transform', `${baseTransform} scale(1)`);
       });
 
-      locationsGroup.appendChild(group);
+      // Click to “lock” tooltip
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showLocationTooltip(company, location, contractors, true);
+      });
+
+      locationsGroup.appendChild(node);
     });
 
     container.appendChild(locationsGroup);
   },
 
   /**
-   * Create location pin SVG
+   * Location pin
    */
   createLocationPin(x, y, contractors, company) {
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('transform', `translate(${x}, ${y})`);
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', `translate(${x}, ${y}) scale(1)`);
 
-    // Get primary contractor color
     const primaryContractor = Array.from(contractors)[0];
     const color = this.contractorColors[primaryContractor] || '#6366f1';
 
-    // Pin shadow
-    const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    shadow.setAttribute('cx', '0');
-    shadow.setAttribute('cy', '22');
-    shadow.setAttribute('rx', '6');
-    shadow.setAttribute('ry', '2');
-    shadow.setAttribute('fill', 'rgba(0, 0, 0, 0.2)');
-    
+    // Shadow
+    const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    ellipse.setAttribute('cx', '0');
+    ellipse.setAttribute('cy', '22');
+    ellipse.setAttribute('rx', '6');
+    ellipse.setAttribute('ry', '2');
+    ellipse.setAttribute('fill', 'rgba(0,0,0,0.2)');
+
     // Pin body
     const pin = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     pin.setAttribute('d', 'M0,-20 C-8,-20 -12,-12 -12,-8 C-12,0 0,20 0,20 C0,20 12,0 12,-8 C12,-12 8,-20 0,-20 Z');
     pin.setAttribute('fill', color);
     pin.setAttribute('stroke', 'white');
     pin.setAttribute('stroke-width', '2');
-    pin.setAttribute('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))');
 
-    // Pin center dot
+    // White dot
     const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     dot.setAttribute('cx', '0');
     dot.setAttribute('cy', '-10');
@@ -425,7 +534,7 @@ const DashboardComponent = {
       multiIndicator.setAttribute('fill', '#10b981');
       multiIndicator.setAttribute('stroke', 'white');
       multiIndicator.setAttribute('stroke-width', '1.5');
-      
+
       const multiText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       multiText.setAttribute('x', '8');
       multiText.setAttribute('y', '-16');
@@ -434,34 +543,31 @@ const DashboardComponent = {
       multiText.setAttribute('font-weight', 'bold');
       multiText.setAttribute('fill', 'white');
       multiText.textContent = contractors.size;
-      
-      group.appendChild(multiIndicator);
-      group.appendChild(multiText);
+
+      g.appendChild(multiIndicator);
+      g.appendChild(multiText);
     }
 
-    group.appendChild(shadow);
-    group.appendChild(pin);
-    group.appendChild(dot);
+    g.appendChild(ellipse);
+    g.appendChild(pin);
+    g.appendChild(dot);
 
-    return group;
+    return g;
   },
 
   /**
    * Get coordinates for a location
+   * - Slight offset to avoid overlapping markers in the same state
    */
   getLocationCoords(location) {
     const stateCoord = this.stateCoords[location.state];
     if (!stateCoord) return null;
 
-    // Add some randomization to prevent overlapping
     const hash = location.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const offsetX = ((hash % 20) - 10) * 2;
     const offsetY = ((hash % 15) - 7) * 2;
 
-    return {
-      x: stateCoord.x + offsetX,
-      y: stateCoord.y + offsetY
-    };
+    return { x: stateCoord.x + offsetX, y: stateCoord.y + offsetY };
   },
 
   /**
@@ -486,16 +592,10 @@ const DashboardComponent = {
         </div>
 
         <!-- Zoom Controls -->
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-sm" id="zoom-in">
-            <span style="font-size: 18px;">+</span> Zoom In
-          </button>
-          <button class="btn btn-sm" id="zoom-out">
-            <span style="font-size: 18px;">−</span> Zoom Out
-          </button>
-          <button class="btn btn-sm" id="zoom-reset">
-            <span style="font-size: 16px;">⟲</span> Reset
-          </button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-sm" id="zoom-in"><span style="font-size: 18px;">+</span> Zoom In</button>
+          <button class="btn btn-sm" id="zoom-out"><span style="font-size: 18px;">−</span> Zoom Out</button>
+          <button class="btn btn-sm" id="zoom-reset"><span style="font-size: 16px;">⟲</span> Reset</button>
         </div>
 
         <!-- Quick Actions -->
@@ -521,12 +621,16 @@ const DashboardComponent = {
           </label>
           <div style="display: flex; flex-direction: column; gap: 6px;">
             <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
-              <input type="checkbox" id="show-connections" checked style="cursor: pointer;">
+              <input type="checkbox" id="show-connections" ${this.state.showConnections ? 'checked' : ''} style="cursor: pointer;">
               Show Connections
             </label>
             <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
-              <input type="checkbox" id="show-state-labels" checked style="cursor: pointer;">
+              <input type="checkbox" id="show-state-labels" ${this.state.showStateLabels ? 'checked' : ''} style="cursor: pointer;">
               Show State Labels
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="show-state-density" ${this.state.showStateDensity ? 'checked' : ''} style="cursor: pointer;">
+              Show State Density
             </label>
           </div>
         </div>
@@ -535,19 +639,20 @@ const DashboardComponent = {
   },
 
   /**
-   * Render contractor checkboxes
+   * Contractor checkboxes
    */
   renderContractorCheckboxes() {
     const contractors = this.getUniqueContractors();
     return contractors.map(contractor => {
       const color = this.contractorColors[contractor] || '#6366f1';
+      const checked = this.state.selectedContractors.has(contractor) ? 'checked' : '';
       return `
         <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
           <input 
             type="checkbox" 
             class="contractor-checkbox" 
             data-contractor="${contractor}"
-            checked
+            ${checked}
             style="cursor: pointer;"
           >
           <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: ${color};"></span>
@@ -571,7 +676,9 @@ const DashboardComponent = {
         ${filteredCompanies.map(company => {
           const isSelected = this.state.selectedCompanies.has(company.name);
           const locations = this.state.locations.filter(l => l.company === company.normalized);
-          
+          const locCount = locations.length;
+          const activeProjects = this.state.projects.filter(p => p.company === company.name).length;
+
           return `
             <div 
               class="company-item" 
@@ -596,7 +703,7 @@ const DashboardComponent = {
                     ${company.name}
                   </div>
                   <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
-                    ${locations.length} location${locations.length !== 1 ? 's' : ''} • ${company.tier}
+                    ${locCount} location${locCount !== 1 ? 's' : ''} • ${company.tier} • ${activeProjects} project${activeProjects !== 1 ? 's' : ''}
                   </div>
                 </div>
               </div>
@@ -608,7 +715,7 @@ const DashboardComponent = {
   },
 
   /**
-   * Render legend
+   * Legend
    */
   renderLegend() {
     const legend = document.getElementById('map-legend');
@@ -636,9 +743,9 @@ const DashboardComponent = {
   },
 
   /**
-   * Show location tooltip
+   * Tooltip
    */
-  showLocationTooltip(company, location, contractors) {
+  showLocationTooltip(company, location, contractors, lock = false) {
     let tooltip = document.getElementById('location-tooltip');
     
     if (!tooltip) {
@@ -653,14 +760,34 @@ const DashboardComponent = {
         box-shadow: var(--shadow-xl);
         z-index: 10000;
         pointer-events: none;
-        max-width: 300px;
+        max-width: 320px;
       `;
       document.body.appendChild(tooltip);
     }
 
+    // projects for this company+location, filtered to selected contractors
     const projects = this.state.projects.filter(p => 
-      p.company === company.name && p.location === location.name
+      p.company === company.name &&
+      p.location === location.name &&
+      (!p.performed_by || this.state.selectedContractors.has(p.performed_by))
     );
+
+    const projectsHTML = projects.length
+      ? projects.slice(0, 5).map(p => `
+        <div style="margin-top: 6px; padding: 8px; border: 1px solid var(--border-light); border-radius: 6px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">${p.job}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${p.trade ?? '-'} • ${p.work_type ?? '-'} • ${p.performed_on ?? (p.start ?? '')}
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            <span style="display:inline-flex;align-items:center;gap:6px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:${this.contractorColors[p.performed_by] || '#64748b'}"></span>
+              ${p.performed_by || '—'}
+            </span>
+          </div>
+        </div>
+      `).join('')
+      : `<div style="font-size:12px;color:var(--text-muted);">No projects (with current contractor filter)</div>`;
 
     tooltip.innerHTML = `
       <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--text-primary);">
@@ -673,40 +800,45 @@ const DashboardComponent = {
         <strong>Contractors:</strong><br>
         ${Array.from(contractors).map(c => `
           <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${this.contractorColors[c]};"></span>
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${this.contractorColors[c] || '#64748b'};"></span>
             ${c}
           </div>
         `).join('')}
       </div>
       <div style="font-size: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-light);">
-        <strong>${projects.length}</strong> active project${projects.length !== 1 ? 's' : ''}
+        <strong>${projects.length}</strong> project${projects.length !== 1 ? 's' : ''} (filtered)
+        ${projectsHTML}
       </div>
     `;
 
     tooltip.style.display = 'block';
+    tooltip.dataset.locked = lock ? '1' : '0';
   },
 
-  /**
-   * Hide location tooltip
-   */
   hideLocationTooltip() {
     const tooltip = document.getElementById('location-tooltip');
-    if (tooltip) tooltip.style.display = 'none';
+    if (tooltip && tooltip.dataset.locked !== '1') tooltip.style.display = 'none';
   },
 
-  /**
-   * Update tooltip position based on mouse
-   */
   updateTooltipPosition(e) {
     const tooltip = document.getElementById('location-tooltip');
     if (!tooltip || tooltip.style.display === 'none') return;
 
-    tooltip.style.left = (e.clientX + 15) + 'px';
-    tooltip.style.top = (e.clientY + 15) + 'px';
+    // keep tooltip on-screen
+    const pad = 12;
+    const w = tooltip.offsetWidth || 280;
+    const h = tooltip.offsetHeight || 150;
+    let x = e.clientX + 15;
+    let y = e.clientY + 15;
+    if (x + w + pad > window.innerWidth)  x = window.innerWidth - w - pad;
+    if (y + h + pad > window.innerHeight) y = window.innerHeight - h - pad;
+
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
   },
 
   /**
-   * Setup event listeners
+   * Event listeners
    */
   setupEventListeners() {
     // Search
@@ -728,7 +860,6 @@ const DashboardComponent = {
       this.state.companies.forEach(c => this.state.selectedCompanies.add(c.name));
       this.render();
     });
-    
     document.getElementById('deselect-all')?.addEventListener('click', () => {
       this.state.selectedCompanies.clear();
       this.render();
@@ -736,7 +867,7 @@ const DashboardComponent = {
 
     // Company list items
     document.querySelectorAll('.company-item').forEach(item => {
-      item.addEventListener('click', (e) => {
+      item.addEventListener('click', () => {
         const companyName = item.dataset.company;
         const checkbox = item.querySelector('input[type="checkbox"]');
         
@@ -755,35 +886,68 @@ const DashboardComponent = {
 
     // Contractor checkboxes
     document.querySelectorAll('.contractor-checkbox').forEach(cb => {
-      cb.addEventListener('change', () => {
+      cb.addEventListener('change', (e) => {
+        const name = e.target.dataset.contractor;
+        if (e.target.checked) {
+          this.state.selectedContractors.add(name);
+        } else {
+          this.state.selectedContractors.delete(name);
+        }
         this.renderMap();
       });
     });
 
     // View options
-    document.getElementById('show-connections')?.addEventListener('change', () => this.renderMap());
-    document.getElementById('show-state-labels')?.addEventListener('change', () => this.renderMap());
+    const conns = document.getElementById('show-connections');
+    if (conns) conns.addEventListener('change', (e) => {
+      this.state.showConnections = !!e.target.checked;
+      this.renderMap();
+    });
+    const labels = document.getElementById('show-state-labels');
+    if (labels) labels.addEventListener('change', (e) => {
+      this.state.showStateLabels = !!e.target.checked;
+      // Just re-render states/labels quickly
+      this.renderMap();
+    });
+    const density = document.getElementById('show-state-density');
+    if (density) density.addEventListener('change', (e) => {
+      this.state.showStateDensity = !!e.target.checked;
+      this.renderMap();
+    });
 
-    // Map drag/pan
+    // Map drag/pan/zoom
     const svg = document.getElementById('us-map-svg');
     if (svg) {
       svg.addEventListener('mousedown', (e) => this.startDrag(e));
       svg.addEventListener('mousemove', (e) => this.drag(e));
       svg.addEventListener('mouseup', () => this.endDrag());
       svg.addEventListener('mouseleave', () => this.endDrag());
-      svg.addEventListener('wheel', (e) => this.handleWheel(e));
+      svg.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
     }
 
-    // Tooltip position tracking
+    // Unlock tooltip when clicking outside
+    document.addEventListener('click', (e) => {
+      const tooltip = document.getElementById('location-tooltip');
+      if (!tooltip) return;
+      if (tooltip.dataset.locked === '1') {
+        // click outside tooltip unlocks
+        if (!tooltip.contains(e.target)) {
+          tooltip.dataset.locked = '0';
+          tooltip.style.display = 'none';
+        }
+      }
+    });
+
+    // Tooltip follows mouse
     document.addEventListener('mousemove', (e) => this.updateTooltipPosition(e));
   },
 
   /**
-   * Zoom functions
+   * Zoom / Pan
    */
   zoom(factor) {
-    this.state.zoomLevel *= factor;
-    this.state.zoomLevel = Math.max(0.5, Math.min(5, this.state.zoomLevel));
+    const prev = this.state.zoomLevel;
+    this.state.zoomLevel = Math.max(0.5, Math.min(5, prev * factor));
     this.updateTransform();
   },
 
@@ -800,9 +964,6 @@ const DashboardComponent = {
     this.zoom(factor);
   },
 
-  /**
-   * Pan functions
-   */
   startDrag(e) {
     this.state.isDragging = true;
     this.state.dragStartX = e.clientX - this.state.panX;
@@ -824,9 +985,6 @@ const DashboardComponent = {
     if (svg) svg.style.cursor = 'grab';
   },
 
-  /**
-   * Update SVG transform
-   */
   updateTransform() {
     const group = document.getElementById('map-main-group');
     if (group) {
@@ -837,7 +995,7 @@ const DashboardComponent = {
   },
 
   /**
-   * Helper functions
+   * Helpers
    */
   getUniqueContractors() {
     const contractors = new Set();
@@ -845,17 +1003,59 @@ const DashboardComponent = {
       const contractor = p.performed_by || p.contractor;
       if (contractor) contractors.add(contractor);
     });
+    // Ensure your network always appears, even if no current projects (safety)
+    ['Guercio Energy Group','KMP','Red Door','Byers','Fritz Staffing','Stable Works','Myers Industrial Services']
+      .forEach(c => contractors.add(c));
     return Array.from(contractors).sort();
   },
 
   getFilteredCompanies() {
-    const term = this.state.searchTerm.toLowerCase();
+    const term = (this.state.searchTerm || '').toLowerCase();
     if (!term) return this.state.companies;
-    
     return this.state.companies.filter(c => 
-      c.name.toLowerCase().includes(term) ||
-      c.tier.toLowerCase().includes(term)
+      (c.name || '').toLowerCase().includes(term) ||
+      (c.tier || '').toLowerCase().includes(term) ||
+      (c.status || '').toLowerCase().includes(term)
     );
+  },
+
+  _contractorsForCompanyLocation(location) {
+    const company = this.state.companies.find(c => c.normalized === location.company);
+    if (!company) return new Set();
+
+    const projects = this.state.projects.filter(p =>
+      p.company === company.name && p.location === location.name
+    );
+
+    const contractors = new Set();
+    projects.forEach(p => {
+      const contractor = p.performed_by || p.contractor;
+      if (contractor) contractors.add(contractor);
+    });
+
+    // If no projects yet, fall back to company-level contractor hints (optional)
+    if (contractors.size === 0 && company.contractors) {
+      Object.values(company.contractors).forEach(v => { if (v) contractors.add(v); });
+    }
+
+    return contractors;
+  },
+
+  _anyContractorSelected(contractorSet) {
+    if (contractorSet.size === 0) return true; // show if unknown
+    for (const c of contractorSet) if (this.state.selectedContractors.has(c)) return true;
+    return false;
+  },
+
+  _getFilteredLocationsForMap() {
+    // company filter + contractor filter
+    return this.state.locations.filter(loc => {
+      const company = this.state.companies.find(c => c.normalized === loc.company);
+      if (!company || !this.state.selectedCompanies.has(company.name)) return false;
+
+      const contractors = this._contractorsForCompanyLocation(loc);
+      return this._anyContractorSelected(contractors);
+    });
   },
 
   /**
@@ -872,4 +1072,4 @@ const DashboardComponent = {
 // Make available globally
 window.DashboardComponent = DashboardComponent;
 
-console.log('📊 Enhanced Dashboard Component loaded and ready');
+console.log('📊 Enhanced Dashboard Component v2 loaded and ready');
