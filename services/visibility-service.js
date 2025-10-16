@@ -114,8 +114,11 @@ const VisibilityService = {
     
     // Filter contacts whose companies are visible
     return contacts.filter(contact => {
+      // ✅ FIXED: Check both 'company' (mock data) and 'company_norm' (Xano data)
       const company = companies.find(c => 
-        c.normalized === contact.company_norm || c.id === contact.company_id
+        c.normalized === contact.company ||           // Mock data field
+        c.normalized === contact.company_norm ||      // Xano field
+        c.id === contact.company_id                   // ID field
       );
       return company && this.canSeeCompany(company, org);
     });
@@ -139,8 +142,11 @@ const VisibilityService = {
     
     // Filter locations whose companies are visible
     return locations.filter(location => {
+      // ✅ FIXED: Check both 'company' (mock data) and 'company_norm' (Xano data)
       const company = companies.find(c => 
-        c.normalized === location.company_norm || c.id === location.company_id
+        c.normalized === location.company ||          // Mock data field
+        c.normalized === location.company_norm ||     // Xano field
+        c.id === location.company_id                  // ID field
       );
       return company && this.canSeeCompany(company, org);
     });
@@ -207,10 +213,12 @@ const VisibilityService = {
     
     // Filter opportunities for visible companies
     return opportunities.filter(opportunity => {
+      // ✅ FIXED: Check both 'company' (mock data) and 'company_name' (Xano data)
       const company = companies.find(c => 
-        c.name === opportunity.company_name || 
-        c.normalized === opportunity.company_norm ||
-        c.id === opportunity.company_id
+        c.name === opportunity.company ||             // Mock data field
+        c.name === opportunity.company_name ||        // Xano field
+        c.normalized === opportunity.company_norm ||  // Normalized field
+        c.id === opportunity.company_id               // ID field
       );
       return company && this.canSeeCompany(company, org);
     });
@@ -276,7 +284,9 @@ const VisibilityService = {
     
     // Organizations can modify contacts at their assigned companies
     const company = companies.find(c => 
-      c.normalized === contact.company_norm || c.id === contact.company_id
+      c.normalized === contact.company ||
+      c.normalized === contact.company_norm || 
+      c.id === contact.company_id
     );
     
     return company && this.canSeeCompany(company, org);
