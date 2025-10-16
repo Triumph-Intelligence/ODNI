@@ -1,18 +1,19 @@
 /**
- * Enhanced Company Matrix Component
- * TRADE-SWAP INTRODUCTIONS (Location & Specialty aware)
+ * Enhanced Company Matrix Component — vNext
+ * OVERVIEW + EXCEL + CONNECT (Trade-Swap)
  *
- * Core goal:
- * If Contractor A worked for Client X at Location L1 in Specialty S1,
- * and Contractor B worked for Client X at Location L2 in Specialty S2 (S1 != S2),
- * then:
- *   - A should introduce B to Client X @ L1 for S2
- *   - B should introduce A to Client X @ L2 for S1
+ * Changes requested:
+ * - ❌ Removed "Relationships" button & view entirely.
+ * - ✅ "Cards" view renamed to "Overview".
+ * - ✅ Overview (collapsed company row) now shows, BEFORE clicking in:
+ *      • Which contractor(s) worked there, and what they did (by trade)
+ *      • Aggregated, company-wide (not location specific)
+ * - ✅ Excel view now has a "Worked By" column with contractor + trade badges.
+ * - ✅ Trade-Swap "Connect" view kept as-is.
  *
- * This file:
- * - Builds a company->location->specialty->contractor work map from projects
- * - Derives explicit, two-way "trade-swap" intros per contractor pair & client
- * - Renders a focused connections view for acting on intros
+ * Data notes:
+ * - Uses project.performed_by and project.trade when present.
+ * - Falls back to project.contractor/vendor/subcontractor and specialty inference.
  */
 
 const CompanyMatrixComponent = {
@@ -24,7 +25,7 @@ const CompanyMatrixComponent = {
     projects: [],
     opportunities: [],
     currentOrg: null,
-    viewMode: 'cards', // 'cards' | 'excel' | 'relationships' | 'connections'
+    viewMode: 'overview', // 'overview' | 'excel' | 'connections'
     filters: {
       search: '',
       showOnlyWorked: false,
@@ -32,8 +33,7 @@ const CompanyMatrixComponent = {
       tier: ''
     },
     expandedCompanies: new Set(),
-    relationshipData: [],
-    connectionData: [] // -> now holds trade-swap intro data (see analyzeTradeSwapConnections)
+    connectionData: [] // -> trade-swap intro data (see analyzeTradeSwapConnections)
   },
 
   /**
@@ -68,14 +68,11 @@ const CompanyMatrixComponent = {
       viewButtonGroup.style.cssText = 'margin-left: auto; display: flex; gap: 4px;';
 
       viewButtonGroup.innerHTML = `
-        <button id="view-cards" class="btn btn-sm btn-primary" title="Card View">
-          <span style="font-size: 16px;">▦</span> Cards
+        <button id="view-overview" class="btn btn-sm btn-primary" title="Overview">
+          <span style="font-size: 16px;">▦</span> Overview
         </button>
         <button id="view-excel" class="btn btn-sm btn-ghost" title="Excel View">
           <span style="font-size: 16px;">⊞</span> Excel
-        </button>
-        <button id="view-relationships" class="btn btn-sm btn-ghost" title="Relationship Intelligence">
-          <span style="font-size: 16px;">🤝</span> Relationships
         </button>
         <button id="view-connections" class="btn btn-sm btn-ghost" title="Trade-Swap Introductions">
           <span style="font-size: 16px;">🔗</span> Connect
@@ -102,10 +99,7 @@ const CompanyMatrixComponent = {
     this.state.projects = VisibilityService.filterProjects(projects, companies, this.state.currentOrg);
     this.state.opportunities = VisibilityService.filterOpportunities(opportunities, companies, this.state.currentOrg);
 
-    // Analyze relationships (kept as-is)
-    this.analyzeRelationships();
-
-    // 🔧 NEW: Trade-swap (location + specialty) introductions
+    // 🔧 Trade-swap (location + specialty) introductions
     this.analyzeTradeSwapConnections();
 
     // Render
@@ -113,94 +107,7 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * ---------- RELATIONSHIPS (kept) ----------
-   */
-  analyzeRelationships() {
-    const relationships = [];
-
-    // Group locations by state (not directly used in swaps, but useful UI)
-    const locationsByState = {};
-    this.state.locations.forEach(location => {
-      const state = location.state;
-      if (!locationsByState[state]) locationsByState[state] = [];
-      locationsByState[state].push({
-        ...location,
-        company: this.state.companies.find(c => c.normalized === location.company)
-      });
-    });
-
-    // Complementary coverage
-    this.state.companies.forEach(companyA => {
-      const companyALocations = this.state.locations.filter(l => l.company === companyA.normalized);
-
-      this.state.companies.forEach(companyB => {
-        if (companyA.normalized >= companyB.normalized) return;
-
-        const companyBLocations = this.state.locations.filter(l => l.company === companyB.normalized);
-
-        const aStates = new Set(companyALocations.map(l => l.state));
-        const bStates = new Set(companyBLocations.map(l => l.state));
-
-        const aStrongStates = [];
-        const bStrongStates = [];
-
-        aStates.forEach(state => {
-          const aCount = companyALocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyA, l)).length;
-          const bCount = companyBLocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyB, l)).length;
-          if (aCount > 0 && bCount === 0) aStrongStates.push(state);
-        });
-
-        bStates.forEach(state => {
-          const bCount = companyBLocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyB, l)).length;
-          const aCount = companyALocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyA, l)).length;
-          if (bCount > 0 && aCount === 0) bStrongStates.push(state);
-        });
-
-        if (aStrongStates.length > 0 && bStrongStates.length > 0) {
-          relationships.push({
-            companyA: companyA.name,
-            companyB: companyB.name,
-            aStrength: aStrongStates,
-            bStrength: bStrongStates,
-            potentialValue: this.calculateRelationshipValue(companyA, companyB, aStrongStates, bStrongStates),
-            type: 'Geographic Complementarity'
-          });
-        }
-
-        // Same-state different-city
-        const sharedStates = Array.from(aStates).filter(s => bStates.has(s));
-        sharedStates.forEach(state => {
-          const aCities = new Set(companyALocations.filter(l => l.state === state).map(l => l.city));
-          const bCities = new Set(companyBLocations.filter(l => l.state === state).map(l => l.city));
-          const aOnlyCities = Array.from(aCities).filter(c => !bCities.has(c));
-          const bOnlyCities = Array.from(bCities).filter(c => !aCities.has(c));
-
-          if (aOnlyCities.length > 0 && bOnlyCities.length > 0) {
-            relationships.push({
-              companyA: companyA.name,
-              companyB: companyB.name,
-              aStrength: aOnlyCities.map(c => `${c}, ${state}`),
-              bStrength: bOnlyCities.map(c => `${c}, ${state}`),
-              potentialValue: this.calculateRelationshipValue(companyA, companyB, aOnlyCities, bOnlyCities),
-              type: 'Same State Coverage'
-            });
-          }
-        });
-      });
-    });
-
-    this.state.relationshipData = relationships.sort((a, b) => b.potentialValue - a.potentialValue);
-  },
-
-  calculateRelationshipValue(companyA, companyB, aStrength, bStrength) {
-    const tierValues = { 'Enterprise': 100, 'Large': 75, 'Mid': 50, 'Small': 25 };
-    const aValue = tierValues[companyA.tier] || 25;
-    const bValue = tierValues[companyB.tier] || 25;
-    return (aValue + bValue) * (aStrength.length + bStrength.length);
-  },
-
-  /**
-   * ---------- TRADE-SWAP CONNECTIONS (NEW CORE LOGIC) ----------
+   * ---------- TRADE-SWAP CONNECTIONS (CORE LOGIC) ----------
    *
    * We build a precise work map:
    *   workMap[companyName][locationName][specialty] = contractorName
@@ -213,18 +120,7 @@ const CompanyMatrixComponent = {
       companyLocationsIndex.set(`${l.company}|${l.name}`, { city: l.city, state: l.state, zip: l.zip });
     });
 
-    // Helper to normalize/format specialties
     const normalizeSpec = (s) => (s || '').toString().trim().toLowerCase();
-    const formatSpecialty = (spec) => {
-      const names = {
-        'electrical': 'Electrical',
-        'mechanical': 'Mechanical',
-        'interior_gc': 'Interior GC',
-        'marketing': 'Marketing',
-        'staffing': 'Staffing'
-      };
-      return names[normalizeSpec(spec)] || spec;
-    };
 
     // Build workMap: company -> location -> specialty -> contractor
     const workMap = {};
@@ -233,12 +129,13 @@ const CompanyMatrixComponent = {
       const companyObj = companiesByName[companyName];
       if (!companyObj) continue;
 
-      // Detect specialty from project
+      // Determine specialty
       const spec = this.getProjectSpecialty(project);
-      if (!spec) continue; // if we can't infer a specialty we skip for trade-swap logic
+      if (!spec) continue;
 
-      // Determine contractor: prefer explicit project.contractor, else company.contractors[spec]
-      const contractorFromProject = project.contractor || project.vendor || project.subcontractor;
+      // Determine contractor (prefer explicit project fields)
+      const contractorFromProject =
+        project.performed_by || project.contractor || project.vendor || project.subcontractor;
       const contractor =
         contractorFromProject ||
         (companyObj.contractors && companyObj.contractors[normalizeSpec(spec)]) ||
@@ -248,7 +145,6 @@ const CompanyMatrixComponent = {
 
       workMap[companyName] ||= {};
       workMap[companyName][project.location] ||= {};
-      // Only set if empty or consistently the same contractor for that spec/location
       if (!workMap[companyName][project.location][spec]) {
         workMap[companyName][project.location][spec] = contractor;
       }
@@ -262,8 +158,7 @@ const CompanyMatrixComponent = {
       const companyObj = companiesByName[companyName];
       const tierVal = tierValues[companyObj?.tier] || 25;
 
-      // Gather "worked locations" per specialty->contractor
-      // specToContractorToLocs: spec -> contractor -> Set(locations)
+      // spec -> contractor -> Set(locations)
       const specToContractorToLocs = {};
       for (const [locName, specToContractor] of Object.entries(byLocation)) {
         for (const [spec, contractor] of Object.entries(specToContractor)) {
@@ -274,16 +169,13 @@ const CompanyMatrixComponent = {
         }
       }
 
-      // All specialties present at this client
       const specs = Object.keys(specToContractorToLocs);
 
-      // For each pair of specialties (sA != sB), get their contractors and worked locs
       for (let i = 0; i < specs.length; i++) {
         for (let j = i + 1; j < specs.length; j++) {
           const sA = specs[i];
           const sB = specs[j];
 
-          // For each contractor of sA and each contractor of sB
           const contractorsA = Object.keys(specToContractorToLocs[sA] || {});
           const contractorsB = Object.keys(specToContractorToLocs[sB] || {});
 
@@ -296,7 +188,6 @@ const CompanyMatrixComponent = {
               if (workedA.length === 0 || workedB.length === 0) continue;
 
               // Build intros:
-              // A ➜ introduce B to A's worked locations for sB (where B hasn't done sB at that location)
               const introsAtoB = [];
               for (const locName of workedA) {
                 const locKey = `${companyObj.normalized}|${locName}`;
@@ -313,7 +204,6 @@ const CompanyMatrixComponent = {
                 }
               }
 
-              // B ➜ introduce A to B's worked locations for sA
               const introsBtoA = [];
               for (const locName of workedB) {
                 const locKey = `${companyObj.normalized}|${locName}`;
@@ -330,18 +220,16 @@ const CompanyMatrixComponent = {
                 }
               }
 
-              // If there is at least one intro in either direction, record this pair
               if (introsAtoB.length > 0 || introsBtoA.length > 0) {
                 const keyAB = `${contractorA}||${contractorB}`;
                 pairsByKey[keyAB] ||= {
                   contractorA,
                   contractorB,
-                  pairs: [], // per-company bundles
+                  pairs: [],
                   potentialValue: 0,
                   type: 'Trade-Swap Introductions'
                 };
 
-                // For context, also track where each worked (in their own specialty) at this company
                 const workedDetailsA = workedA.map(locName => {
                   const locKey = `${companyObj.normalized}|${locName}`;
                   const { city = '', state = '' } = companyLocationsIndex.get(locKey) || {};
@@ -361,11 +249,10 @@ const CompanyMatrixComponent = {
                   bSpecialty: sB,
                   aWorked: workedDetailsA,
                   bWorked: workedDetailsB,
-                  introsAtoB, // A ➜ intro B to these Ls for bSpecialty
-                  introsBtoA  // B ➜ intro A to these Ls for aSpecialty
+                  introsAtoB,
+                  introsBtoA
                 });
 
-                // Score: weighted by company tier and total intros
                 pairsByKey[keyAB].potentialValue += tierVal * (introsAtoB.length + introsBtoA.length);
               }
             }
@@ -374,51 +261,45 @@ const CompanyMatrixComponent = {
       }
     }
 
-    // Save results
-    const connections = Object.values(pairsByKey).sort((a, b) => b.potentialValue - a.potentialValue);
-    this.state.connectionData = connections;
+    this.state.connectionData = Object.values(pairsByKey).sort((a, b) => b.potentialValue - a.potentialValue);
   },
 
   /**
-   * Try to determine the specialty of a project.
+   * Determine a project's specialty (trade).
    * Uses explicit fields if present; otherwise infers from job text.
    */
   getProjectSpecialty(project) {
-    const raw = (project.specialty || project.trade || project.category || '').toString().toLowerCase().trim();
+    const raw = (project.trade || project.specialty || project.category || '').toString().toLowerCase().trim();
     if (raw) return raw;
 
     const job = (project.job || '').toString().toLowerCase();
-    // Simple keyword inference (tweak as desired)
     if (/(electrical|panel|lighting|switchgear|transformer|breaker|feeder|conduit|power)/.test(job)) return 'electrical';
     if (/(mechanical|hvac|air handler|chiller|boiler|duct|vav|rtu|cooling|heating)/.test(job)) return 'mechanical';
     if (/(interior|fit[-\s]?out|fitout|tenant|build[-\s]?out|gc\b|general contractor)/.test(job)) return 'interior_gc';
     if (/(marketing|brand|signage|campaign|promo)/.test(job)) return 'marketing';
     if (/(staffing|temp labor|labor hire|recruit)/.test(job)) return 'staffing';
-    return ''; // unknown -> we skip for trade-swap logic
+    return '';
   },
 
   /**
-   * ---------- RENDER ----------
+   * ---------- RENDER ROOT ----------
    */
   render() {
     switch (this.state.viewMode) {
       case 'excel':
         this.renderExcelView();
         break;
-      case 'relationships':
-        this.renderRelationshipView();
-        break;
       case 'connections':
-        this.renderConnectionView(); // new, trade-swap focused
+        this.renderConnectionView();
         break;
       default:
-        this.renderMatrix();
+        this.renderOverview();
     }
     this.renderStatistics();
   },
 
   /**
-   * Render Excel-like grid view (unchanged)
+   * ---------- EXCEL VIEW (improved with "Worked By") ----------
    */
   renderExcelView() {
     const container = document.getElementById('company-matrix-container');
@@ -432,7 +313,8 @@ const CompanyMatrixComponent = {
           <thead style="position: sticky; top: 0; background: var(--background-alt); z-index: 10;">
             <tr>
               <th style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 0; background: var(--background-alt); z-index: 11;">Company</th>
-              <th style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 120px; background: var(--background-alt); z-index: 11;">Tier</th>
+              <th style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 160px; background: var(--background-alt); z-index: 11;">Tier</th>
+              <th style="border: 1px solid var(--border-color); padding: 8px; min-width: 220px;">Worked By</th>
               ${states.map(state => `
                 <th style="border: 1px solid var(--border-color); padding: 8px; min-width: 100px; text-align: center;">
                   ${state}
@@ -447,6 +329,18 @@ const CompanyMatrixComponent = {
 
     this.state.companies.forEach(company => {
       const companyLocations = this.state.locations.filter(l => l.company === company.normalized);
+
+      // Contractor summary at-a-glance
+      const contractorSummary = this.getCompanyContractorSummary(company.name); // [{contractor, trades:Set, count, last}]
+      const contractorBadges = contractorSummary.length
+        ? contractorSummary.slice(0, 4).map(cs => `
+            <span class="badge badge-primary" style="font-size: 10px; margin-right: 4px; margin-bottom: 4px; display:inline-flex; gap:4px; align-items:center;">
+              ${cs.contractor}
+              <span style="opacity:.75;">(${Array.from(cs.trades).map(t => this.prettyTrade(t)).join(', ')})</span>
+            </span>
+          `).join('') + (contractorSummary.length > 4 ? `<span class="badge badge-secondary" style="font-size: 10px;">+${contractorSummary.length - 4} more</span>` : '')
+        : '<span style="color: var(--text-muted);">—</span>';
+
       let totalWorked = 0;
       let totalOpportunities = 0;
 
@@ -455,12 +349,15 @@ const CompanyMatrixComponent = {
           <td style="border: 1px solid var(--border-color); padding: 8px; font-weight: 600; position: sticky; left: 0; background: var(--background);">
             ${company.name}
           </td>
-          <td style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 120px; background: var(--background);">
+          <td style="border: 1px solid var(--border-color); padding: 8px; position: sticky; left: 160px; background: var(--background);">
             <span class="badge badge-secondary">${company.tier}</span>
+          </td>
+          <td style="border: 1px solid var(--border-color); padding: 8px;">
+            ${contractorBadges}
           </td>
       `;
 
-      states.forEach(state => {
+      const statesCells = states.map(state => {
         const stateLocations = companyLocations.filter(l => l.state === state);
         const workedCount = stateLocations.filter(l => this.hasWorkedAtLocation(company, l)).length;
         const totalCount = stateLocations.length;
@@ -485,8 +382,10 @@ const CompanyMatrixComponent = {
           cellStyle += ' color: var(--text-secondary);';
         }
 
-        html += `<td style="${cellStyle}" title="${stateLocations.map(l => l.city).join(', ')}">${cellContent}</td>`;
-      });
+        return `<td style="${cellStyle}" title="${stateLocations.map(l => l.city).join(', ')}">${cellContent}</td>`;
+      }).join('');
+
+      html += statesCells;
 
       html += `
         <td style="border: 1px solid var(--border-color); padding: 8px; text-align: center; background: rgba(16, 185, 129, 0.05); font-weight: 600; color: var(--success-color);">
@@ -518,88 +417,8 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Render Relationship view (unchanged)
-   */
-  renderRelationshipView() {
-    const container = document.getElementById('company-matrix-container');
-    if (!container) return;
-
-    if (this.state.relationshipData.length === 0) {
-      container.innerHTML = '<div class="table-empty">No cross-company introduction opportunities found</div>';
-      return;
-    }
-
-    let html = `
-      <div class="relationship-header" style="margin-bottom: 24px;">
-        <h3 style="margin: 0; margin-bottom: 8px;">🤝 Introduction Opportunities</h3>
-        <p style="color: var(--text-secondary); margin: 0;">
-          These companies have complementary geographic coverage and could benefit from introductions
-        </p>
-      </div>
-      <div class="relationship-grid" style="display: grid; gap: 16px;">
-    `;
-
-    this.state.relationshipData.slice(0, 10).forEach((rel, index) => {
-      const companyA = this.state.companies.find(c => c.name === rel.companyA);
-      const companyB = this.state.companies.find(c => c.name === rel.companyB);
-
-      html += `
-        <div class="relationship-card card" style="padding: 20px; border-left: 4px solid var(--primary-color);">
-          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 16px;">
-              <div style="font-size: 24px; font-weight: bold; color: var(--primary-color); opacity: 0.3;">#${index + 1}</div>
-              <div>
-                <h4 style="margin: 0; font-size: 18px;">${rel.companyA} ↔ ${rel.companyB}</h4>
-                <div style="display: flex; gap: 8px; margin-top: 6px;">
-                  <span class="badge badge-secondary">${companyA?.tier}</span>
-                  <span class="badge badge-secondary">${companyB?.tier}</span>
-                  <span class="badge badge-primary">${rel.type}</span>
-                </div>
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Potential Score</div>
-              <div style="font-size: 24px; font-weight: bold; color: var(--primary-color);">${rel.potentialValue}</div>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-            <div style="padding: 12px; background: rgba(16, 185, 129, 0.05); border-radius: 8px;">
-              <div style="font-weight: 600; margin-bottom: 8px; color: var(--success-color);">${rel.companyA} knows:</div>
-              <div style="font-size: 13px; line-height: 1.6;">
-                ${rel.aStrength.map(s => `<div>• ${s}</div>`).join('')}
-              </div>
-            </div>
-            <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-radius: 8px;">
-              <div style="font-weight: 600; margin-bottom: 8px; color: var(--primary-color);">${rel.companyB} knows:</div>
-              <div style="font-size: 13px; line-height: 1.6;">
-                ${rel.bStrength.map(s => `<div>• ${s}</div>`).join('')}
-              </div>
-            </div>
-          </div>
-
-          <div style="margin-top: 16px; padding: 12px; background: var(--background-alt); border-radius: 6px;">
-            <div style="font-size: 13px; color: var(--text-secondary);">
-              <strong>💡 Opportunity:</strong>
-              ${rel.companyA} could introduce ${rel.companyB} to their contacts in <strong>${rel.aStrength.join(', ')}</strong>,
-              while ${rel.companyB} could reciprocate with introductions in <strong>${rel.bStrength.join(', ')}</strong>.
-            </div>
-          </div>
-
-          <div style="margin-top: 12px; display: flex; gap: 8px;">
-            <button class="btn btn-sm btn-primary" onclick="CompanyMatrixComponent.createIntroduction('${rel.companyA}', '${rel.companyB}')">📧 Draft Introduction Email</button>
-            <button class="btn btn-sm btn-ghost" onclick="CompanyMatrixComponent.viewRelationshipDetails('${rel.companyA}', '${rel.companyB}')">View Details</button>
-          </div>
-        </div>
-      `;
-    });
-
-    html += '</div>';
-    container.innerHTML = html;
-  },
-
-  /**
-   * Render Contractor Connection View - TRADE-SWAP INTRODUCTIONS
+   * ---------- CONNECT VIEW (Trade-Swap Introductions) ----------
+   * (unchanged)
    */
   renderConnectionView() {
     const container = document.getElementById('company-matrix-container');
@@ -628,7 +447,6 @@ const CompanyMatrixComponent = {
     `;
 
     this.state.connectionData.forEach((conn, index) => {
-      // Sum intros for quick header badge
       const totalIntros = conn.pairs.reduce((acc, p) => acc + p.introsAtoB.length + p.introsBtoA.length, 0);
 
       html += `
@@ -741,9 +559,6 @@ Best regards,
     alert('Email Template:\n\n' + email);
   },
 
-  /**
-   * Quick detail view of the trade-swap packet (per client)
-   */
   viewTradeSwapDetails(contractorA, contractorB, companyName) {
     const conn = this.state.connectionData.find(c => c.contractorA === contractorA && c.contractorB === contractorB);
     if (!conn) return alert('Connection not found');
@@ -768,9 +583,10 @@ Best regards,
   },
 
   /**
-   * ---------- CARDS / MATRIX VIEW (kept, with contractor badges) ----------
+   * ---------- OVERVIEW (formerly "Cards") ----------
+   * Adds: "Worked By" summary (contractor + trade) BEFORE expanding a company.
    */
-  renderMatrix() {
+  renderOverview() {
     const container = document.getElementById('company-matrix-container');
     if (!container) return;
 
@@ -809,7 +625,25 @@ Best regards,
         }
       });
 
-      // Apply location filters
+      // Company-wide contractor summary (not location specific)
+      const contractorSummary = this.getCompanyContractorSummary(company.name);
+      const workedBySection = contractorSummary.length ? `
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size: 11px; color: var(--text-muted);">Worked By</div>
+          <div style="display:flex; flex-wrap: wrap; gap:6px;">
+            ${contractorSummary.slice(0, 5).map(cs => `
+              <span class="badge badge-primary" style="font-size: 10px; padding: 4px 8px;">
+                ${cs.contractor} <span style="opacity: .75;">(${Array.from(cs.trades).map(t => this.prettyTrade(t)).join(', ')})</span>
+              </span>
+            `).join('')}
+            ${contractorSummary.length > 5 ? `<span class="badge badge-secondary" style="font-size:10px;">+${contractorSummary.length - 5} more</span>` : ''}
+          </div>
+        </div>
+      ` : `
+        <div style="font-size: 11px; color: var(--text-muted);">No work recorded yet</div>
+      `;
+
+      // Apply location filters for expansion
       let displayLocations = companyLocations;
       if (this.state.filters.showOnlyWorked) {
         displayLocations = companyLocations.filter(l => this.hasWorkedAtLocation(company, l));
@@ -824,7 +658,7 @@ Best regards,
         <div class="card" style="margin-bottom: 20px;">
           <div class="card-header" style="cursor: pointer; user-select: none;"
                onclick="CompanyMatrixComponent.toggleCompany('${company.normalized}')">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <span style="font-size: 20px; transition: transform 0.3s;">${isExpanded ? '▼' : '▶'}</span>
                 <div>
@@ -835,18 +669,22 @@ Best regards,
                   </div>
                 </div>
               </div>
-              <div style="display: flex; gap: 20px; align-items: center;">
-                <div style="text-align: center;">
-                  <div style="font-size: 20px; font-weight: bold; color: var(--success-color);">${companyWorkedCount}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">Worked</div>
-                </div>
-                <div style="text-align: center;">
-                  <div style="font-size: 20px; font-weight: bold; color: var(--warning-color);">${companyUnworkedCount}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">Opportunities</div>
-                </div>
-                <div style="text-align: center;">
-                  <div style="font-size: 20px; font-weight: bold; color: var(--primary-color);">${this.formatCurrency(companyInvoiced)}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">Total Invoiced</div>
+
+              <div style="display:flex; align-items:flex-start; gap:24px;">
+                ${workedBySection}
+                <div style="display:flex; gap:20px; align-items:center;">
+                  <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: var(--success-color);">${companyWorkedCount}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Worked</div>
+                  </div>
+                  <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: var(--warning-color);">${companyUnworkedCount}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Opportunities</div>
+                  </div>
+                  <div style="text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: var(--primary-color);">${this.formatCurrency(companyInvoiced)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Total Invoiced</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -871,21 +709,54 @@ Best regards,
   },
 
   /**
+   * Company-wide contractor summary (NOT location-specific)
+   * Returns sorted array: [{contractor, trades:Set, count, last}]
+   */
+  getCompanyContractorSummary(companyName) {
+    const rows = this.state.projects.filter(p => p.company === companyName);
+    if (!rows.length) return [];
+
+    const map = new Map(); // contractor -> {trades:Set, count, last}
+    for (const p of rows) {
+      const contractor = p.performed_by || p.contractor || p.vendor || p.subcontractor;
+      const trade = (p.trade || this.getProjectSpecialty(p) || '').toLowerCase();
+      if (!contractor || !trade) continue;
+
+      const key = contractor.trim();
+      if (!map.has(key)) {
+        map.set(key, { contractor: key, trades: new Set(), count: 0, last: null });
+      }
+      const rec = map.get(key);
+      rec.trades.add(trade);
+      rec.count += 1;
+
+      const d = p.performed_on || p.end || p.start;
+      if (d) {
+        const time = new Date(d).getTime();
+        if (!rec.last || time > rec.last) rec.last = time;
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return (b.last || 0) - (a.last || 0);
+    });
+  },
+
+  /**
    * Get contractors who worked at a specific location (based on actual projects + specialty inference)
    * Used for small badges on the location cards.
    */
   getLocationContractors(company, location) {
     const contractors = [];
-    // Pull projects for this location
     const locationProjects = this.state.projects.filter(p => p.company === company.name && p.location === location.name);
     if (locationProjects.length === 0) return contractors;
 
-    // Map specialty -> contractor from projects (using detection)
     const seen = new Set();
     for (const p of locationProjects) {
-      const spec = this.getProjectSpecialty(p);
+      const spec = (p.trade || this.getProjectSpecialty(p));
       if (!spec) continue;
-      const contractor = p.contractor || p.vendor || p.subcontractor ||
+      const contractor = p.performed_by || p.contractor || p.vendor || p.subcontractor ||
         (this.state.companies.find(c => c.name === company.name)?.contractors?.[spec]);
       if (!contractor) continue;
       const key = `${contractor}::${spec}`;
@@ -906,16 +777,12 @@ Best regards,
     const contacts = this.getLocationContacts(company, location);
     const contractors = this.getLocationContractors(company, location);
 
-    // Get projects for this location
     const locationProjects = this.state.projects.filter(p => p.company === company.name && p.location === location.name);
 
     const cardClass = hasWorked ? 'location-worked' : 'location-opportunity';
     const borderColor = hasWorked ? 'var(--success-color)' : 'var(--warning-color)';
 
-    const formatSpecialty = (spec) => {
-      const names = { electrical: 'Electrical', mechanical: 'Mechanical', interior_gc: 'Interior GC', marketing: 'Marketing', staffing: 'Staffing' };
-      return names[(spec || '').toLowerCase()] || spec;
-    };
+    const formatSpecialty = (spec) => this.prettyTrade(spec);
 
     return `
       <div class="location-card ${cardClass}"
@@ -1139,12 +1006,17 @@ Best regards,
   },
 
   /**
-   * Utility & UI helpers (kept)
+   * Utility & UI helpers
    */
   toggleCompany(companyId) {
     if (this.state.expandedCompanies.has(companyId)) this.state.expandedCompanies.delete(companyId);
     else this.state.expandedCompanies.add(companyId);
-    this.renderMatrix();
+    this.renderOverview();
+  },
+
+  prettyTrade(spec) {
+    const names = { electrical: 'Electrical', mechanical: 'Mechanical', interior_gc: 'Interior GC', marketing: 'Marketing', staffing: 'Staffing' };
+    return names[(spec || '').toLowerCase()] || spec || '—';
   },
 
   getRelativeTime(dateStr) {
@@ -1181,14 +1053,11 @@ Best regards,
       btn.classList.remove('btn-ghost'); btn.classList.add('btn-primary');
     };
 
-    const viewCardsBtn = document.getElementById('view-cards');
-    if (viewCardsBtn) viewCardsBtn.addEventListener('click', () => { this.state.viewMode = 'cards'; setActive(viewCardsBtn); this.render(); });
+    const viewOverviewBtn = document.getElementById('view-overview');
+    if (viewOverviewBtn) viewOverviewBtn.addEventListener('click', () => { this.state.viewMode = 'overview'; setActive(viewOverviewBtn); this.render(); });
 
     const viewExcelBtn = document.getElementById('view-excel');
     if (viewExcelBtn) viewExcelBtn.addEventListener('click', () => { this.state.viewMode = 'excel'; setActive(viewExcelBtn); this.render(); });
-
-    const viewRelationshipsBtn = document.getElementById('view-relationships');
-    if (viewRelationshipsBtn) viewRelationshipsBtn.addEventListener('click', () => { this.state.viewMode = 'relationships'; setActive(viewRelationshipsBtn); this.render(); });
 
     const viewConnectionsBtn = document.getElementById('view-connections');
     if (viewConnectionsBtn) viewConnectionsBtn.addEventListener('click', () => { this.state.viewMode = 'connections'; setActive(viewConnectionsBtn); this.render(); });
@@ -1313,65 +1182,9 @@ Best regards,
         </div>
       `;
     }
-  },
-
-  /**
-   * (kept) Relationship email helpers
-   */
-  createIntroduction(companyA, companyB) {
-    const rel = this.state.relationshipData.find(r =>
-      (r.companyA === companyA && r.companyB === companyB) ||
-      (r.companyA === companyB && r.companyB === companyA)
-    );
-    if (!rel) return alert('Relationship data not found');
-
-    const emailTemplate = `
-Subject: Introduction: ${companyA} ↔ ${companyB}
-
-Dear [Contact Name],
-
-I wanted to introduce you to [Other Contact Name] from ${rel.companyA === companyA ? companyB : companyA}.
-
-${companyA} has strong presence in ${rel.companyA === companyA ? rel.aStrength.join(', ') : rel.bStrength.join(', ')}, while ${companyB} has established operations in ${rel.companyB === companyB ? rel.bStrength.join(', ') : rel.aStrength.join(', ')}.
-
-I believe there could be valuable synergies between your organizations, particularly in terms of geographic coverage and potential collaboration opportunities.
-
-Would you both be interested in a brief introductory call to explore potential areas of mutual benefit?
-
-Best regards,
-[Your Name]`.trim();
-
-    alert('Email Template:\n\n' + emailTemplate);
-  },
-
-  viewRelationshipDetails(companyA, companyB) {
-    const rel = this.state.relationshipData.find(r =>
-      (r.companyA === companyA && r.companyB === companyB) ||
-      (r.companyA === companyB && r.companyB === companyA)
-    );
-    if (!rel) return alert('Relationship data not found');
-
-    alert(`
-Relationship Analysis: ${companyA} ↔ ${companyB}
-
-Type: ${rel.type}
-Potential Value Score: ${rel.potentialValue}
-
-${companyA} Coverage:
-${rel.companyA === companyA ? rel.aStrength.map(s => '• ' + s).join('\n') : rel.bStrength.map(s => '• ' + s).join('\n')}
-
-${companyB} Coverage:
-${rel.companyB === companyB ? rel.bStrength.map(s => '• ' + s).join('\n') : rel.aStrength.map(s => '• ' + s).join('\n')}
-
-This relationship offers strong potential for:
-- Geographic expansion opportunities
-- Cross-referral partnerships
-- Knowledge sharing
-- Joint business development
-    `.trim());
   }
 };
 
 // Expose globally
 window.CompanyMatrixComponent = CompanyMatrixComponent;
-console.log('📊 Company Matrix Component loaded (TRADE-SWAP INTRO VERSION)');
+console.log('📊 Company Matrix Component loaded (Overview + Excel + Connect)');
