@@ -1,7 +1,7 @@
 /**
  * Enhanced Company Matrix Component
  * Now includes relationship intelligence, introduction opportunities, and contractor connections
- * LOCATION-BASED CONNECTION ANALYSIS
+ * LOCATION-BASED CONNECTION ANALYSIS WITH CLEAR CONTRACTOR VISIBILITY
  */
 
 const CompanyMatrixComponent = {
@@ -111,6 +111,34 @@ const CompanyMatrixComponent = {
     
     // Render based on view mode
     this.render();
+  },
+
+  /**
+   * Get contractors who worked at a specific location (based on actual projects)
+   */
+  getLocationContractors(company, location) {
+    const locationProjects = this.state.projects.filter(p => 
+      p.company === company.name && p.location === location.name
+    );
+    
+    if (locationProjects.length === 0) return [];
+    
+    // Get unique specialties from projects and map to contractors
+    const contractors = [];
+    const companyData = this.state.companies.find(c => c.name === company.name);
+    
+    if (companyData && companyData.contractors) {
+      Object.entries(companyData.contractors).forEach(([specialty, contractor]) => {
+        if (contractor) {
+          contractors.push({
+            name: contractor,
+            specialty: specialty
+          });
+        }
+      });
+    }
+    
+    return contractors;
   },
 
   /**
@@ -666,7 +694,7 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Render Contractor Connection View - LOCATION-BASED VERSION
+   * Render Contractor Connection View - ENHANCED WITH CITY/STATE DETAILS
    */
   renderConnectionView() {
     const container = document.getElementById('company-matrix-container');
@@ -689,11 +717,23 @@ const CompanyMatrixComponent = {
       return names[spec] || spec;
     };
     
+    // Get city/state for a location
+    const getLocationDetails = (locationName, companyName) => {
+      const company = this.state.companies.find(c => c.name === companyName);
+      if (!company) return locationName;
+      
+      const location = this.state.locations.find(l => 
+        l.company === company.normalized && l.name === locationName
+      );
+      
+      return location ? `${locationName} (${location.city}, ${location.state})` : locationName;
+    };
+    
     let html = `
       <div class="relationship-header" style="margin-bottom: 24px;">
-        <h3 style="margin: 0; margin-bottom: 8px;">🔗 Make a Connection</h3>
+        <h3 style="margin: 0; margin-bottom: 8px;">🔗 Contractor Connections</h3>
         <p style="color: var(--text-secondary); margin: 0;">
-          Identify contractors working at different locations of the same companies - perfect for coordination and introductions
+          See which contractors are working at different locations of the same companies - perfect for coordination
         </p>
       </div>
       
@@ -741,31 +781,37 @@ const CompanyMatrixComponent = {
                     <span class="badge badge-secondary" style="font-size: 10px;">${shared.tier}</span>
                   </div>
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
-                    <div style="padding: 8px; background: rgba(99, 102, 241, 0.05); border-radius: 4px;">
-                      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">
-                        ${conn.contractorA} locations:
+                    <div style="padding: 10px; background: rgba(99, 102, 241, 0.08); border-radius: 4px; border-left: 2px solid rgba(99, 102, 241, 0.4);">
+                      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">
+                        📍 ${conn.contractorA} locations:
                       </div>
                       ${shared.aLocations.map(loc => `
-                        <div style="font-size: 12px; margin-top: 4px;">
-                          • ${loc.location} <span style="color: var(--text-muted); font-size: 10px;">(${formatSpecialty(loc.specialty)})</span>
+                        <div style="font-size: 12px; margin-top: 4px; padding: 4px 0;">
+                          <strong>• ${getLocationDetails(loc.location, shared.company)}</strong>
+                          <div style="color: var(--text-muted); font-size: 10px; margin-left: 12px;">
+                            ${formatSpecialty(loc.specialty)} • ${loc.projectName}
+                          </div>
                         </div>
                       `).join('')}
                     </div>
-                    <div style="padding: 8px; background: rgba(139, 92, 246, 0.05); border-radius: 4px;">
-                      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">
-                        ${conn.contractorB} locations:
+                    <div style="padding: 10px; background: rgba(139, 92, 246, 0.08); border-radius: 4px; border-left: 2px solid rgba(139, 92, 246, 0.4);">
+                      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">
+                        📍 ${conn.contractorB} locations:
                       </div>
                       ${shared.bLocations.map(loc => `
-                        <div style="font-size: 12px; margin-top: 4px;">
-                          • ${loc.location} <span style="color: var(--text-muted); font-size: 10px;">(${formatSpecialty(loc.specialty)})</span>
+                        <div style="font-size: 12px; margin-top: 4px; padding: 4px 0;">
+                          <strong>• ${getLocationDetails(loc.location, shared.company)}</strong>
+                          <div style="color: var(--text-muted); font-size: 10px; margin-left: 12px;">
+                            ${formatSpecialty(loc.specialty)} • ${loc.projectName}
+                          </div>
                         </div>
                       `).join('')}
                     </div>
                   </div>
                 </div>
               `).join('')}
-              <div style="margin-top: 8px; padding: 8px; background: rgba(16, 185, 129, 0.05); border-radius: 4px;">
-                <div style="font-size: 12px; color: var(--text-secondary); font-style: italic;">
+              <div style="margin-top: 8px; padding: 10px; background: rgba(16, 185, 129, 0.05); border-radius: 4px;">
+                <div style="font-size: 12px; color: var(--text-secondary);">
                   💡 <strong>Key Insight:</strong> These contractors are working at different locations of the same ${conn.sharedCompanies.length === 1 ? 'company' : 'companies'}. 
                   They should coordinate on best practices, pricing strategies, and potential referrals between locations.
                 </div>
@@ -788,7 +834,13 @@ const CompanyMatrixComponent = {
                       </div>
                       <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${item.locations.length} location${item.locations.length > 1 ? 's' : ''}: 
-                        ${item.locations.slice(0, 2).map(l => l.location).join(', ')}${item.locations.length > 2 ? '...' : ''}
+                        ${item.locations.slice(0, 2).map(l => {
+                          const loc = this.state.locations.find(location => 
+                            location.name === l.location && 
+                            location.company === this.state.companies.find(c => c.name === item.company)?.normalized
+                          );
+                          return loc ? `${loc.city}, ${loc.state}` : l.location;
+                        }).join(', ')}${item.locations.length > 2 ? '...' : ''}
                       </div>
                     </div>
                   `).join('')}
@@ -815,7 +867,13 @@ const CompanyMatrixComponent = {
                       </div>
                       <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${item.locations.length} location${item.locations.length > 1 ? 's' : ''}: 
-                        ${item.locations.slice(0, 2).map(l => l.location).join(', ')}${item.locations.length > 2 ? '...' : ''}
+                        ${item.locations.slice(0, 2).map(l => {
+                          const loc = this.state.locations.find(location => 
+                            location.name === l.location && 
+                            location.company === this.state.companies.find(c => c.name === item.company)?.normalized
+                          );
+                          return loc ? `${loc.city}, ${loc.state}` : l.location;
+                        }).join(', ')}${item.locations.length > 2 ? '...' : ''}
                       </div>
                     </div>
                   `).join('')}
@@ -1336,12 +1394,13 @@ Best regards,
   },
 
   /**
-   * Render a location card
+   * Render a location card - ENHANCED WITH CONTRACTOR INFO
    */
   renderLocationCard(company, location) {
     const hasWorked = this.hasWorkedAtLocation(company, location);
     const invoiced = this.getLocationInvoicedAmount(company, location);
     const contacts = this.getLocationContacts(company, location);
+    const contractors = this.getLocationContractors(company, location);
     
     // Get projects for this location
     const locationProjects = this.state.projects.filter(p => 
@@ -1350,6 +1409,18 @@ Best regards,
     
     const cardClass = hasWorked ? 'location-worked' : 'location-opportunity';
     const borderColor = hasWorked ? 'var(--success-color)' : 'var(--warning-color)';
+    
+    // Format specialty names
+    const formatSpecialty = (spec) => {
+      const names = {
+        'electrical': 'Electrical',
+        'mechanical': 'Mechanical',
+        'interior_gc': 'Interior GC',
+        'marketing': 'Marketing',
+        'staffing': 'Staffing'
+      };
+      return names[spec] || spec;
+    };
     
     return `
       <div class="location-card ${cardClass}" 
@@ -1367,6 +1438,21 @@ Best regards,
             ${hasWorked ? '✓ Worked' : '○ Opportunity'}
           </span>
         </div>
+        
+        ${contractors.length > 0 ? `
+          <div style="margin-bottom: 12px; padding: 10px; background: rgba(99, 102, 241, 0.08); border-radius: 6px; border-left: 3px solid var(--primary-color);">
+            <div style="font-size: 11px; font-weight: 600; color: var(--primary-color); margin-bottom: 6px;">
+              🔧 Contractors at this location:
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+              ${contractors.map(c => `
+                <span class="badge badge-primary" style="font-size: 10px; padding: 4px 8px;">
+                  ${c.name} <span style="opacity: 0.7;">(${formatSpecialty(c.specialty)})</span>
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
         
         ${hasWorked ? `
           <div style="margin-bottom: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
@@ -1827,4 +1913,4 @@ Best regards,
 // Make available globally
 window.CompanyMatrixComponent = CompanyMatrixComponent;
 
-console.log('📊 Enhanced Company Matrix Component loaded (LOCATION-BASED VERSION)');
+console.log('📊 Enhanced Company Matrix Component loaded (LOCATION-BASED WITH CONTRACTOR VISIBILITY)');
