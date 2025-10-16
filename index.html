@@ -165,7 +165,9 @@
                         Office of National Intelligence
                     </button>
                 </div>
-                
+                <button class="nav-item" data-page="company-matrix">
+    Company Matrix
+</button>
                 <div class="nav-section">
                     <h3 class="nav-section-title">CRM</h3>
                     <button class="nav-item" data-page="companies">
@@ -326,6 +328,45 @@
                 </div>
             </div>
 
+
+
+            <!-- Company Matrix Page -->
+<div id="company-matrix" class="page">
+    <div class="page-header">
+        <h2 class="page-title">Company Matrix</h2>
+        <p class="page-subtitle">Comprehensive view of all company locations and work history</p>
+        <div class="page-actions">
+            <button class="btn btn-sm" id="expand-all-btn">Expand All</button>
+            <button class="btn btn-sm" id="collapse-all-btn">Collapse All</button>
+        </div>
+    </div>
+
+    <div id="matrix-stats">
+        <!-- Statistics will be rendered here -->
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <input type="text" class="search-input" placeholder="Search companies..." id="matrix-search">
+            <div class="table-filters">
+                <select class="form-select" id="matrix-tier-filter">
+                    <option value="">All Tiers</option>
+                    <option value="Enterprise">Enterprise</option>
+                    <option value="Large">Large</option>
+                    <option value="Mid">Mid</option>
+                    <option value="Small">Small</option>
+                </select>
+                <button class="btn btn-sm" id="show-worked-only">Show Worked Only</button>
+                <button class="btn btn-sm" id="show-unworked-only">Show Opportunities Only</button>
+            </div>
+        </div>
+        <div id="company-matrix-container" style="padding: 20px;">
+            <!-- Matrix will be rendered here -->
+        </div>
+    </div>
+</div>
+
+            
             <!-- Companies Page -->
             <div id="companies" class="page">
                 <div class="page-header">
@@ -541,6 +582,7 @@
     <!-- <script src="components/shared/sidebar.js"></script> -->
     <script src="components/dashboard.js"></script>
     <script src="components/intelligence/intelligence.js"></script> -->
+    <script src="components/company-matrix/company-matrix.js"></script>
     <script src="components/companies/companies.js"></script> -->
     <script src="components/contacts/contacts.js"></script> -->
     <script src="components/referrals/referrals.js"></script> -->
