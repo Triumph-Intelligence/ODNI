@@ -1,5 +1,5 @@
 /**
- * Intelligence Component — vNext
+ * Intelligence Component — vNext (Fixed & Enhanced)
  * Office of National Intelligence (kept & upgraded)
  *
  * What's new (meaningful upgrades):
@@ -10,6 +10,7 @@
  * - "Worked By" rollups in matrix + smarter search/filtering by contractor
  * - Richer CSV exports (dynamic top contractor per trade, contact freshness)
  * - Safer DOM guards (renders only where containers exist)
+ * - Enhanced logging and error handling
  *
  * Expected DOM ids (existing ones kept):
  *  - KPIs: intel-companies, intel-locations, intel-contacts, intel-unserved (optional extra: intel-worked, intel-overdue, intel-gifts, intel-swaps-kpi)
@@ -47,21 +48,35 @@ const IntelligenceComponent = {
     try {
       // Set current organization
       this.state.currentOrg = VisibilityService.getCurrentOrg();
+      console.log('📋 Current organization:', this.state.currentOrg);
 
       // Load and render data
       await this.loadData();
-      this.analyze(); // build summaries, indexes, trade-swap, freshness
+      
+      // Analyze must happen after loadData completes
+      await this.analyze(); // build summaries, indexes, trade-swap, freshness
+      
       this.setupEventListeners();
 
-      // Initial renders
+      // Initial renders - ensure analysis is complete first
       this.renderSummary();
       this.renderContractorMatrix();
       this.renderLocationIntelligence();
       this.renderTradeSwapSection();
 
       console.log('✅ Intelligence Component initialized');
+      console.log('📊 Final state:', {
+        companies: this.state.companies.length,
+        locations: this.state.locations.length,
+        contacts: this.state.contacts.length,
+        projects: this.state.projects.length,
+        opportunities: this.state.opportunities.length,
+        summaries: this.state.summariesByCompany.size,
+        connections: this.state.connectionData.length
+      });
     } catch (error) {
-      console.error('Error initializing Intelligence Component:', error);
+      console.error('❌ Error initializing Intelligence Component:', error);
+      console.error('Stack trace:', error.stack);
       this.showError();
     }
   },
@@ -70,20 +85,67 @@ const IntelligenceComponent = {
    * Load all data from DataService
    */
   async loadData() {
-    const companies = await DataService.getCompanies();
-    const locations = await DataService.getLocations();
-    const contacts = await DataService.getContacts();
-    const gifts    = await DataService.getGifts();
-    const projects = await DataService.getProjects?.() || [];
-    const opportunities = await DataService.getOpportunities?.() || [];
+    console.log('📥 Loading intelligence data...');
+    
+    try {
+      const companies = await DataService.getCompanies();
+      const locations = await DataService.getLocations();
+      const contacts = await DataService.getContacts();
+      const gifts = await DataService.getGifts();
+      const projects = await DataService.getProjects();
+      const opportunities = await DataService.getOpportunities();
 
-    // Apply visibility filters
-    this.state.companies     = VisibilityService.filterCompanies(companies, this.state.currentOrg);
-    this.state.locations     = VisibilityService.filterLocations(locations, companies, this.state.currentOrg);
-    this.state.contacts      = VisibilityService.filterContacts(contacts, companies, this.state.currentOrg);
-    this.state.gifts         = VisibilityService.filterGifts(gifts, contacts, companies, this.state.currentOrg);
-    this.state.projects      = VisibilityService.filterProjects?.(projects, companies, this.state.currentOrg) || projects;
-    this.state.opportunities = VisibilityService.filterOpportunities?.(opportunities, companies, this.state.currentOrg) || opportunities;
+      console.log('📦 Raw data loaded:', {
+        companies: companies.length,
+        locations: locations.length,
+        contacts: contacts.length,
+        gifts: gifts.length,
+        projects: projects.length,
+        opportunities: opportunities.length
+      });
+
+      // Apply visibility filters
+      this.state.companies = VisibilityService.filterCompanies(companies, this.state.currentOrg);
+      this.state.locations = VisibilityService.filterLocations(locations, companies, this.state.currentOrg);
+      this.state.contacts = VisibilityService.filterContacts(contacts, companies, this.state.currentOrg);
+      this.state.gifts = VisibilityService.filterGifts(gifts, contacts, companies, this.state.currentOrg);
+      
+      // Handle projects and opportunities - check if filter methods exist
+      if (VisibilityService.filterProjects && typeof VisibilityService.filterProjects === 'function') {
+        this.state.projects = VisibilityService.filterProjects(projects, companies, this.state.currentOrg);
+      } else {
+        console.warn('⚠️ VisibilityService.filterProjects not available, using fallback');
+        // Fallback: filter by company visibility
+        this.state.projects = projects.filter(p => {
+          const company = companies.find(c => c.name === p.company);
+          return company && VisibilityService.canSeeCompany(company, this.state.currentOrg);
+        });
+      }
+      
+      if (VisibilityService.filterOpportunities && typeof VisibilityService.filterOpportunities === 'function') {
+        this.state.opportunities = VisibilityService.filterOpportunities(opportunities, companies, this.state.currentOrg);
+      } else {
+        console.warn('⚠️ VisibilityService.filterOpportunities not available, using fallback');
+        // Fallback: filter by company visibility
+        this.state.opportunities = opportunities.filter(o => {
+          const company = companies.find(c => c.name === o.company);
+          return company && VisibilityService.canSeeCompany(company, this.state.currentOrg);
+        });
+      }
+
+      console.log('✅ Filtered data:', {
+        companies: this.state.companies.length,
+        locations: this.state.locations.length,
+        contacts: this.state.contacts.length,
+        gifts: this.state.gifts.length,
+        projects: this.state.projects.length,
+        opportunities: this.state.opportunities.length,
+        currentOrg: this.state.currentOrg
+      });
+    } catch (error) {
+      console.error('❌ Error in loadData:', error);
+      throw error;
+    }
   },
 
   /**
@@ -93,46 +155,63 @@ const IntelligenceComponent = {
    * - Global contractor index
    * - Trade-swap connections
    */
-  analyze() {
-    this.state.summariesByCompany.clear();
-    this.state.lastProjectByCompany.clear();
-    this.state.contractorIndex.clear();
+  async analyze() {
+    console.log('🔍 Analyzing intelligence data...');
+    
+    try {
+      this.state.summariesByCompany.clear();
+      this.state.lastProjectByCompany.clear();
+      this.state.contractorIndex.clear();
 
-    const companiesByName = Object.fromEntries(this.state.companies.map(c => [c.name, c]));
+      const companiesByName = Object.fromEntries(this.state.companies.map(c => [c.name, c]));
 
-    // Build per-company contractor summaries & last project timestamps
-    const projectsByCompany = new Map();
-    for (const p of this.state.projects) {
-      if (!p.company) continue;
-      if (!projectsByCompany.has(p.company)) projectsByCompany.set(p.company, []);
-      projectsByCompany.get(p.company).push(p);
-    }
-
-    for (const [companyName, rows] of projectsByCompany.entries()) {
-      const summary = this.getCompanyContractorSummary(companyName, rows);
-      this.state.summariesByCompany.set(companyName, summary);
-
-      // last project timestamp (for freshness KPI)
-      const lastTs = rows
-        .map(p => new Date(p.performed_on || p.end || p.start || 0).getTime())
-        .filter(Boolean)
-        .sort((a,b)=>b-a)[0];
-      if (lastTs) this.state.lastProjectByCompany.set(companyName, lastTs);
-
-      // Update global contractor index
-      for (const s of summary) {
-        if (!this.state.contractorIndex.has(s.contractor)) {
-          this.state.contractorIndex.set(s.contractor, { companies: new Set(), trades: new Set(), count: 0 });
-        }
-        const idx = this.state.contractorIndex.get(s.contractor);
-        idx.companies.add(companyName);
-        s.trades.forEach(t => idx.trades.add(t));
-        idx.count += s.count;
+      // Build per-company contractor summaries & last project timestamps
+      const projectsByCompany = new Map();
+      for (const p of this.state.projects) {
+        if (!p.company) continue;
+        if (!projectsByCompany.has(p.company)) projectsByCompany.set(p.company, []);
+        projectsByCompany.get(p.company).push(p);
       }
-    }
 
-    // Build trade-swap connections (across companies)
-    this.analyzeTradeSwapConnections(companiesByName);
+      console.log('📊 Projects grouped by company:', projectsByCompany.size);
+
+      for (const [companyName, rows] of projectsByCompany.entries()) {
+        const summary = this.getCompanyContractorSummary(companyName, rows);
+        this.state.summariesByCompany.set(companyName, summary);
+
+        // last project timestamp (for freshness KPI)
+        const lastTs = rows
+          .map(p => new Date(p.performed_on || p.end || p.start || 0).getTime())
+          .filter(Boolean)
+          .sort((a,b)=>b-a)[0];
+        if (lastTs) this.state.lastProjectByCompany.set(companyName, lastTs);
+
+        // Update global contractor index
+        for (const s of summary) {
+          if (!this.state.contractorIndex.has(s.contractor)) {
+            this.state.contractorIndex.set(s.contractor, { companies: new Set(), trades: new Set(), count: 0 });
+          }
+          const idx = this.state.contractorIndex.get(s.contractor);
+          idx.companies.add(companyName);
+          s.trades.forEach(t => idx.trades.add(t));
+          idx.count += s.count;
+        }
+      }
+
+      console.log('📈 Analysis results:', {
+        summaries: this.state.summariesByCompany.size,
+        contractors: this.state.contractorIndex.size,
+        lastProjects: this.state.lastProjectByCompany.size
+      });
+
+      // Build trade-swap connections (across companies)
+      this.analyzeTradeSwapConnections(companiesByName);
+      
+      console.log('🔗 Trade-swap connections found:', this.state.connectionData.length);
+    } catch (error) {
+      console.error('❌ Error in analyze:', error);
+      throw error;
+    }
   },
 
   /**
@@ -302,34 +381,57 @@ const IntelligenceComponent = {
    * Render Intelligence Summary KPIs
    */
   renderSummary() {
-    // Base KPIs
-    const companiesTracked = this.state.companies.length;
-    const totalLocations   = this.state.locations.length;
-    const totalContacts    = this.state.contacts.length;
+    console.log('📊 Rendering intelligence summary...');
+    
+    try {
+      // Base KPIs
+      const companiesTracked = this.state.companies.length;
+      const totalLocations = this.state.locations.length;
+      const totalContacts = this.state.contacts.length;
 
-    const unservedLocations = this.calculateUnservedLocations();
-    const overdueLocations  = this.calculateOverdueLocations(90);
-    const workedCompanies   = this.countWorkedCompanies();
-    const giftsCount        = this.state.gifts.length;
-    const swapOppsCount     = this.state.connectionData.reduce((acc, c) =>
-      acc + c.pairs.reduce((a,p)=>a + p.introsAtoB.length + p.introsBtoA.length, 0), 0);
+      const unservedLocations = this.calculateUnservedLocations();
+      const overdueLocations = this.calculateOverdueLocations(90);
+      const workedCompanies = this.countWorkedCompanies();
+      const giftsCount = this.state.gifts.length;
+      const swapOppsCount = this.state.connectionData.reduce((acc, c) =>
+        acc + c.pairs.reduce((a,p)=>a + p.introsAtoB.length + p.introsBtoA.length, 0), 0);
 
-    // Update DOM (existing)
-    this.setText('intel-companies', companiesTracked);
-    this.setText('intel-locations', totalLocations);
-    this.setText('intel-contacts',  totalContacts);
-    this.setText('intel-unserved',  unservedLocations);
+      console.log('📈 KPI values:', {
+        companiesTracked,
+        totalLocations,
+        totalContacts,
+        unservedLocations,
+        overdueLocations,
+        workedCompanies,
+        giftsCount,
+        swapOppsCount
+      });
 
-    // Optional extras (render if present)
-    this.setText('intel-overdue', overdueLocations);
-    this.setText('intel-worked',  workedCompanies);
-    this.setText('intel-gifts',   giftsCount);
-    this.setText('intel-swaps-kpi', swapOppsCount);
+      // Update DOM (existing)
+      this.setText('intel-companies', companiesTracked);
+      this.setText('intel-locations', totalLocations);
+      this.setText('intel-contacts', totalContacts);
+      this.setText('intel-unserved', unservedLocations);
+
+      // Optional extras (render if present)
+      this.setText('intel-overdue', overdueLocations);
+      this.setText('intel-worked', workedCompanies);
+      this.setText('intel-gifts', giftsCount);
+      this.setText('intel-swaps-kpi', swapOppsCount);
+      
+      console.log('✅ Summary rendered successfully');
+    } catch (error) {
+      console.error('❌ Error rendering summary:', error);
+    }
   },
 
   setText(id, value) {
     const el = document.getElementById(id);
-    if (el) el.textContent = String(value);
+    if (el) {
+      el.textContent = String(value);
+    } else {
+      console.warn(`⚠️ Element not found: #${id}`);
+    }
   },
 
   /**
@@ -396,8 +498,13 @@ const IntelligenceComponent = {
    * Render Contractor Intelligence Matrix (now dynamic, from projects)
    */
   renderContractorMatrix() {
+    console.log('🏗️ Rendering contractor matrix...');
+    
     const tbody = document.getElementById('intel-matrix-body');
-    if (!tbody) return;
+    if (!tbody) {
+      console.warn('⚠️ Contractor matrix table body not found (#intel-matrix-body)');
+      return;
+    }
 
     if (this.state.companies.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No companies found</td></tr>';
@@ -415,11 +522,13 @@ const IntelligenceComponent = {
       return matchesSearch && matchesContractor;
     });
 
+    console.log(`📋 Filtered companies: ${filtered.length} of ${this.state.companies.length}`);
+
     // Build rows
     const rows = filtered.map(company => {
       const summary = this.state.summariesByCompany.get(company.name) || [];
       const locationCount = this.state.locations.filter(l => l.company === company.normalized).length;
-      const contactCount  = this.state.contacts.filter(c => c.company === company.normalized).length;
+      const contactCount = this.state.contacts.filter(c => c.company === company.normalized).length;
       const lastProjectTs = this.state.lastProjectByCompany.get(company.name) || null;
 
       // dynamic top contractor per trade (from projects)
@@ -482,6 +591,8 @@ const IntelligenceComponent = {
       });
       contractorFilter.appendChild(frag);
     }
+    
+    console.log('✅ Contractor matrix rendered successfully');
   },
 
   /**
@@ -708,11 +819,16 @@ const IntelligenceComponent = {
    * Render Location Intelligence (upgraded with contractors + last project)
    */
   renderLocationIntelligence() {
+    console.log('📍 Rendering location intelligence...');
+    
     const tbody = document.getElementById('intel-locations-body');
-    if (!tbody) return;
+    if (!tbody) {
+      console.warn('⚠️ Location intelligence table body not found (#intel-locations-body)');
+      return;
+    }
 
     if (this.state.locations.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No locations found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No locations found</td></tr>';
       return;
     }
 
@@ -798,7 +914,8 @@ const IntelligenceComponent = {
       `;
     }).filter(Boolean).join('');
 
-    tbody.innerHTML = rows || '<tr><td colspan="7" class="table-empty">No location data available</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="8" class="table-empty">No location data available</td></tr>';
+    console.log('✅ Location intelligence rendered successfully');
   },
 
   /**
@@ -806,8 +923,13 @@ const IntelligenceComponent = {
    * Writes into #intel-swaps (or #intel-relationships) if present.
    */
   renderTradeSwapSection() {
+    console.log('🔗 Rendering trade-swap section...');
+    
     const container = document.getElementById('intel-swaps') || document.getElementById('intel-relationships');
-    if (!container) return;
+    if (!container) {
+      console.warn('⚠️ Trade-swap container not found (#intel-swaps or #intel-relationships)');
+      return;
+    }
 
     if (this.state.connectionData.length === 0) {
       container.innerHTML = '<div class="table-empty">No trade-swap introduction opportunities found</div>';
@@ -854,12 +976,16 @@ const IntelligenceComponent = {
         }).join('')}
       </div>
     `;
+    
+    console.log('✅ Trade-swap section rendered successfully');
   },
 
   /**
    * Setup event listeners
    */
   setupEventListeners() {
+    console.log('🎧 Setting up event listeners...');
+    
     const searchInput = document.getElementById('intel-search');
     if (searchInput) {
       searchInput.addEventListener('input', Utils.debounce((e) => {
@@ -974,11 +1100,12 @@ const IntelligenceComponent = {
    * Error state
    */
   showError() {
+    console.error('🚨 Showing error state');
     ['intel-companies', 'intel-locations', 'intel-contacts', 'intel-unserved'].forEach(id => this.setText(id, 'Error'));
     const matrixBody = document.getElementById('intel-matrix-body');
     if (matrixBody) matrixBody.innerHTML = '<tr><td colspan="7" class="table-empty">Error loading contractor matrix</td></tr>';
     const locationsBody = document.getElementById('intel-locations-body');
-    if (locationsBody) locationsBody.innerHTML = '<tr><td colspan="7" class="table-empty">Error loading location intelligence</td></tr>';
+    if (locationsBody) locationsBody.innerHTML = '<tr><td colspan="8" class="table-empty">Error loading location intelligence</td></tr>';
     const swaps = document.getElementById('intel-swaps');
     if (swaps) swaps.innerHTML = '<div class="table-empty">Error loading trade-swap intelligence</div>';
   },
@@ -989,7 +1116,7 @@ const IntelligenceComponent = {
   async refresh() {
     console.log('🔄 Refreshing Intelligence Component...');
     await this.loadData();
-    this.analyze();
+    await this.analyze();
     this.renderSummary();
     this.renderContractorMatrix();
     this.renderLocationIntelligence();
@@ -1037,8 +1164,6 @@ const IntelligenceComponent = {
     for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
     const h = Math.abs(hash) % 360;
     const s = 65; const l = darkText ? 35 : 60;
-    const toHex = (v) => v.toString(16).padStart(2, '0');
-    // also return as hsl string for CSS (we use as color text); background uses same hue lighter
     return `hsl(${h} ${s}% ${l}%)`;
   }
 };
@@ -1046,4 +1171,4 @@ const IntelligenceComponent = {
 // Make available globally
 window.IntelligenceComponent = IntelligenceComponent;
 
-console.log('🕵️ Intelligence Component loaded (vNext)');
+console.log('🕵️ Intelligence Component loaded (vNext - Fixed & Enhanced)');
