@@ -215,29 +215,6 @@ const DashboardComponent = {
 // Make available globally
 window.DashboardComponent = DashboardComponent;
 
-// Wait for all dependencies to load, then auto-initialize
-function initDashboardWhenReady() {
-  // Check if all dependencies exist
-  if (typeof window.DataService === 'undefined' || 
-      typeof window.VisibilityService === 'undefined') {
-    console.log('⏳ Dashboard waiting for dependencies...');
-    setTimeout(initDashboardWhenReady, 100);
-    return;
-  }
-
-  // Check if dashboard page is active
-  const dashboardPage = document.getElementById('dashboard');
-  if (dashboardPage && dashboardPage.classList.contains('active')) {
-    console.log('🚀 Starting dashboard initialization...');
-    DashboardComponent.init();
-  }
-}
-
-// Start initialization check when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initDashboardWhenReady);
-} else {
-  initDashboardWhenReady();
-}
-
-console.log('📊 Dashboard Component loaded');
+// ✅ FIXED: Don't auto-initialize - let App.js handle it
+// The dashboard will be initialized by App.loadPageComponent() when needed
+console.log('📊 Dashboard Component loaded and ready');
