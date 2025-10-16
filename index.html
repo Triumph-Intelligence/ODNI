@@ -72,20 +72,6 @@
             margin-left: var(--spacing-sm);
         }
         
-        /* Dashboard specific styles */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            gap: 24px;
-            margin-top: 24px;
-        }
-        
-        @media (max-width: 1200px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
         /* Responsive adjustments */
         @media (max-width: 1400px) {
             .page {
@@ -178,10 +164,10 @@
                     <button class="nav-item" data-page="intelligence">
                         Office of National Intelligence
                     </button>
-                    <button class="nav-item" data-page="company-matrix">
-                        Company Matrix
-                    </button>
-                </div>
+                <button class="nav-item" data-page="company-matrix">
+                Company Matrix
+                </button>
+                 </div>
                 <div class="nav-section">
                     <h3 class="nav-section-title">CRM</h3>
                     <button class="nav-item" data-page="companies">
@@ -209,57 +195,33 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Dashboard Page - ENHANCED WITH MAP -->
+            <!-- Dashboard Page -->
             <div id="dashboard" class="page active">
                 <div class="page-header">
                     <h2 class="page-title">Dashboard</h2>
-                    <p class="page-subtitle">Interactive map and analytics for your network</p>
+                    <p class="page-subtitle">Overview of your key metrics and recent activity</p>
                 </div>
 
-                <!-- Statistics Cards - rendered by dashboard.js -->
-                <div id="dashboard-stats"></div>
-
-                <!-- Main Dashboard Grid - Map Section -->
-                <div class="dashboard-grid">
-                    
-                    <!-- Left Column - Map -->
-                    <div class="card" style="padding: 0; overflow: hidden;">
-                        <div class="card-header" style="padding: 20px;">
-                            <h3 class="card-title">Company Network Map</h3>
-                            <p class="card-subtitle" style="margin: 0;">Interactive visualization of locations and contractor relationships</p>
-                        </div>
-                        
-                        <!-- US Map Container -->
-                        <div id="us-map-container" style="padding: 20px; min-height: 600px;"></div>
-                        
-                        <!-- Map Legend -->
-                        <div id="map-legend" style="padding: 20px; border-top: 1px solid var(--border-light);"></div>
+                <div class="card-grid">
+                    <div class="card kpi-card clickable" data-page="contacts">
+                        <div class="kpi-value" id="kpi-overdue-touches">—</div>
+                        <div class="kpi-label">Overdue Touches</div>
                     </div>
-
-                    <!-- Right Column - Controls & List -->
-                    <div style="display: flex; flex-direction: column; gap: 24px;">
-                        
-                        <!-- Map Controls -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">Map Controls</h3>
-                            </div>
-                            <div id="map-controls"></div>
-                        </div>
-
-                        <!-- Company List -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">Companies</h3>
-                            </div>
-                            <div id="company-list"></div>
-                        </div>
-
+                    <div class="card kpi-card">
+                        <div class="kpi-value" id="kpi-last-gift">—</div>
+                        <div class="kpi-label">Days Since Last Gift</div>
+                    </div>
+                    <div class="card kpi-card">
+                        <div class="kpi-value" id="kpi-referrals">—</div>
+                        <div class="kpi-label">Referrals Asked (30d)</div>
+                    </div>
+                    <div class="card kpi-card">
+                        <div class="kpi-value" id="kpi-open-opps">—</div>
+                        <div class="kpi-label">Open Opps (Weighted)</div>
                     </div>
                 </div>
 
-                <!-- Recent Activity -->
-                <div class="card" style="margin-top: 24px;">
+                <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Recent Activity</h3>
                     </div>
@@ -366,42 +328,45 @@
                 </div>
             </div>
 
+
+
             <!-- Company Matrix Page -->
-            <div id="company-matrix" class="page">
-                <div class="page-header">
-                    <h2 class="page-title">Company Matrix</h2>
-                    <p class="page-subtitle">Comprehensive view of all company locations and work history</p>
-                    <div class="page-actions">
-                        <button class="btn btn-sm" id="expand-all-btn">Expand All</button>
-                        <button class="btn btn-sm" id="collapse-all-btn">Collapse All</button>
-                    </div>
-                </div>
+<div id="company-matrix" class="page">
+    <div class="page-header">
+        <h2 class="page-title">Company Matrix</h2>
+        <p class="page-subtitle">Comprehensive view of all company locations and work history</p>
+        <div class="page-actions">
+            <button class="btn btn-sm" id="expand-all-btn">Expand All</button>
+            <button class="btn btn-sm" id="collapse-all-btn">Collapse All</button>
+        </div>
+    </div>
 
-                <div id="matrix-stats">
-                    <!-- Statistics will be rendered here -->
-                </div>
+    <div id="matrix-stats">
+        <!-- Statistics will be rendered here -->
+    </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <input type="text" class="search-input" placeholder="Search companies..." id="matrix-search">
-                        <div class="table-filters">
-                            <select class="form-select" id="matrix-tier-filter">
-                                <option value="">All Tiers</option>
-                                <option value="Enterprise">Enterprise</option>
-                                <option value="Large">Large</option>
-                                <option value="Mid">Mid</option>
-                                <option value="Small">Small</option>
-                            </select>
-                            <button class="btn btn-sm" id="show-worked-only">Show Worked Only</button>
-                            <button class="btn btn-sm" id="show-unworked-only">Show Opportunities Only</button>
-                        </div>
-                    </div>
-                    <div id="company-matrix-container" style="padding: 20px;">
-                        <!-- Matrix will be rendered here -->
-                    </div>
-                </div>
+    <div class="card">
+        <div class="card-header">
+            <input type="text" class="search-input" placeholder="Search companies..." id="matrix-search">
+            <div class="table-filters">
+                <select class="form-select" id="matrix-tier-filter">
+                    <option value="">All Tiers</option>
+                    <option value="Enterprise">Enterprise</option>
+                    <option value="Large">Large</option>
+                    <option value="Mid">Mid</option>
+                    <option value="Small">Small</option>
+                </select>
+                <button class="btn btn-sm" id="show-worked-only">Show Worked Only</button>
+                <button class="btn btn-sm" id="show-unworked-only">Show Opportunities Only</button>
             </div>
+        </div>
+        <div id="company-matrix-container" style="padding: 20px;">
+            <!-- Matrix will be rendered here -->
+        </div>
+    </div>
+</div>
 
+            
             <!-- Companies Page -->
             <div id="companies" class="page">
                 <div class="page-header">
@@ -612,18 +577,17 @@
     <script src="services/visibility-service.js"></script>
     <script src="services/data-service.js"></script>
     
-    <!-- 5. Components - Load dashboard.js, others commented out until created -->
+    <!-- 5. Components (uncomment as you create them) -->
+    <!-- <script src="components/shared/header.js"></script> -->
+    <!-- <script src="components/shared/sidebar.js"></script> -->
     <script src="components/dashboard.js"></script>
-    
-    <!-- Uncomment these as you create the component files:
-    <script src="components/intelligence/intelligence.js"></script>
+    <script src="components/intelligence/intelligence.js"></script> -->
     <script src="components/company-matrix/company-matrix.js"></script>
-    <script src="components/companies/companies.js"></script>
-    <script src="components/contacts/contacts.js"></script>
-    <script src="components/referrals/referrals.js"></script>
-    <script src="components/opportunities/opportunities.js"></script>
-    <script src="components/projects/projects.js"></script>
-    -->
+    <script src="components/companies/companies.js"></script> -->
+    <script src="components/contacts/contacts.js"></script> -->
+    <script src="components/referrals/referrals.js"></script> -->
+    <script src="components/opportunities/opportunities.js"></script> -->
+    <script src="components/projects/projects.js"></script> -->
     
     <!-- 6. Main App (must load last) -->
     <script src="assets/js/app.js"></script>
