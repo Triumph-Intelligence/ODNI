@@ -72,6 +72,26 @@
             margin-left: var(--spacing-sm);
         }
         
+        /* Map visualization layout */
+        .map-section {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .map-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+        
+        .map-main {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+        
         /* Responsive adjustments */
         @media (max-width: 1400px) {
             .page {
@@ -82,6 +102,10 @@
         @media (max-width: 1200px) {
             .card-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .map-section {
+                grid-template-columns: 1fr;
             }
         }
         
@@ -164,10 +188,10 @@
                     <button class="nav-item" data-page="intelligence">
                         Office of National Intelligence
                     </button>
-                <button class="nav-item" data-page="company-matrix">
-                Company Matrix
-                </button>
-                 </div>
+                    <button class="nav-item" data-page="company-matrix">
+                        Company Matrix
+                    </button>
+                </div>
                 <div class="nav-section">
                     <h3 class="nav-section-title">CRM</h3>
                     <button class="nav-item" data-page="companies">
@@ -202,6 +226,7 @@
                     <p class="page-subtitle">Overview of your key metrics and recent activity</p>
                 </div>
 
+                <!-- Existing KPI Cards -->
                 <div class="card-grid">
                     <div class="card kpi-card clickable" data-page="contacts">
                         <div class="kpi-value" id="kpi-overdue-touches">—</div>
@@ -221,6 +246,43 @@
                     </div>
                 </div>
 
+                <!-- NEW: Dashboard.js Statistics Container (4 KPI cards rendered by dashboard.js) -->
+                <div id="dashboard-stats"></div>
+
+                <!-- NEW: Map Visualization Section -->
+                <div class="map-section">
+                    <!-- Sidebar with company list and legend -->
+                    <div class="map-sidebar">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Companies</h3>
+                            </div>
+                            <!-- Company list container -->
+                            <div id="company-list"></div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Legend</h3>
+                            </div>
+                            <!-- Map legend container -->
+                            <div id="map-legend"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Main map area -->
+                    <div class="map-main">
+                        <div class="card">
+                            <!-- Map controls container -->
+                            <div id="map-controls"></div>
+                            
+                            <!-- US map container -->
+                            <div id="us-map-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Recent Activity Table -->
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Recent Activity</h3>
@@ -328,44 +390,41 @@
                 </div>
             </div>
 
-
-
             <!-- Company Matrix Page -->
-<div id="company-matrix" class="page">
-    <div class="page-header">
-        <h2 class="page-title">Company Matrix</h2>
-        <p class="page-subtitle">Comprehensive view of all company locations and work history</p>
-        <div class="page-actions">
-            <button class="btn btn-sm" id="expand-all-btn">Expand All</button>
-            <button class="btn btn-sm" id="collapse-all-btn">Collapse All</button>
-        </div>
-    </div>
+            <div id="company-matrix" class="page">
+                <div class="page-header">
+                    <h2 class="page-title">Company Matrix</h2>
+                    <p class="page-subtitle">Comprehensive view of all company locations and work history</p>
+                    <div class="page-actions">
+                        <button class="btn btn-sm" id="expand-all-btn">Expand All</button>
+                        <button class="btn btn-sm" id="collapse-all-btn">Collapse All</button>
+                    </div>
+                </div>
 
-    <div id="matrix-stats">
-        <!-- Statistics will be rendered here -->
-    </div>
+                <div id="matrix-stats">
+                    <!-- Statistics will be rendered here -->
+                </div>
 
-    <div class="card">
-        <div class="card-header">
-            <input type="text" class="search-input" placeholder="Search companies..." id="matrix-search">
-            <div class="table-filters">
-                <select class="form-select" id="matrix-tier-filter">
-                    <option value="">All Tiers</option>
-                    <option value="Enterprise">Enterprise</option>
-                    <option value="Large">Large</option>
-                    <option value="Mid">Mid</option>
-                    <option value="Small">Small</option>
-                </select>
-                <button class="btn btn-sm" id="show-worked-only">Show Worked Only</button>
-                <button class="btn btn-sm" id="show-unworked-only">Show Opportunities Only</button>
+                <div class="card">
+                    <div class="card-header">
+                        <input type="text" class="search-input" placeholder="Search companies..." id="matrix-search">
+                        <div class="table-filters">
+                            <select class="form-select" id="matrix-tier-filter">
+                                <option value="">All Tiers</option>
+                                <option value="Enterprise">Enterprise</option>
+                                <option value="Large">Large</option>
+                                <option value="Mid">Mid</option>
+                                <option value="Small">Small</option>
+                            </select>
+                            <button class="btn btn-sm" id="show-worked-only">Show Worked Only</button>
+                            <button class="btn btn-sm" id="show-unworked-only">Show Opportunities Only</button>
+                        </div>
+                    </div>
+                    <div id="company-matrix-container" style="padding: 20px;">
+                        <!-- Matrix will be rendered here -->
+                    </div>
+                </div>
             </div>
-        </div>
-        <div id="company-matrix-container" style="padding: 20px;">
-            <!-- Matrix will be rendered here -->
-        </div>
-    </div>
-</div>
-
             
             <!-- Companies Page -->
             <div id="companies" class="page">
@@ -577,17 +636,15 @@
     <script src="services/visibility-service.js"></script>
     <script src="services/data-service.js"></script>
     
-    <!-- 5. Components (uncomment as you create them) -->
-    <!-- <script src="components/shared/header.js"></script> -->
-    <!-- <script src="components/shared/sidebar.js"></script> -->
+    <!-- 5. Components -->
     <script src="components/dashboard.js"></script>
-    <script src="components/intelligence/intelligence.js"></script> -->
+    <script src="components/intelligence/intelligence.js"></script>
     <script src="components/company-matrix/company-matrix.js"></script>
-    <script src="components/companies/companies.js"></script> -->
-    <script src="components/contacts/contacts.js"></script> -->
-    <script src="components/referrals/referrals.js"></script> -->
-    <script src="components/opportunities/opportunities.js"></script> -->
-    <script src="components/projects/projects.js"></script> -->
+    <script src="components/companies/companies.js"></script>
+    <script src="components/contacts/contacts.js"></script>
+    <script src="components/referrals/referrals.js"></script>
+    <script src="components/opportunities/opportunities.js"></script>
+    <script src="components/projects/projects.js"></script>
     
     <!-- 6. Main App (must load last) -->
     <script src="assets/js/app.js"></script>
