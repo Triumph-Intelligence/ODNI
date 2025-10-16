@@ -1,6 +1,7 @@
 /**
  * Enhanced Company Matrix Component
  * Now includes relationship intelligence, introduction opportunities, and contractor connections
+ * LOCATION-BASED CONNECTION ANALYSIS
  */
 
 const CompanyMatrixComponent = {
@@ -105,7 +106,7 @@ const CompanyMatrixComponent = {
     // Analyze relationships
     this.analyzeRelationships();
     
-    // Analyze contractor connections
+    // Analyze contractor connections (LOCATION-BASED)
     this.analyzeContractorConnections();
     
     // Render based on view mode
@@ -217,84 +218,166 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Analyze contractor connection opportunities
+   * Analyze contractor connection opportunities - LOCATION-BASED VERSION
    */
   analyzeContractorConnections() {
     const connections = [];
     
-    // Map of contractor names to their organizations
-    const contractorOrgs = {
-      'Guercio Energy Group': 'Guercio Energy Group',
-      'Myers Industrial Services': 'Myers Industrial Services',
-      'KMP': 'KMP',
-      'Stable Works': 'Stable Works',
-      'Red Door': 'Red Door',
-      'Fritz Staffing': 'Fritz Staffing',
-      'Byers': 'Byers'
-    };
+    // Build a map of contractors to the LOCATIONS they've worked at
+    const contractorToLocations = {};
     
-    // Build a map of contractors to the companies they work with
-    const contractorToCompanies = {};
-    
-    this.state.companies.forEach(company => {
-      if (company.contractors) {
-        Object.entries(company.contractors).forEach(([specialty, contractor]) => {
-          if (contractor) {
-            if (!contractorToCompanies[contractor]) {
-              contractorToCompanies[contractor] = [];
-            }
-            contractorToCompanies[contractor].push({
-              company: company.name,
-              companyNormalized: company.normalized,
-              tier: company.tier,
-              specialty: specialty,
-              hqState: company.hq_state
-            });
-          }
-        });
-      }
+    // Analyze which contractors have worked at which locations (based on projects)
+    this.state.projects.forEach(project => {
+      const company = this.state.companies.find(c => c.name === project.company);
+      if (!company || !company.contractors) return;
+      
+      // Check which contractors are assigned to this company
+      Object.entries(company.contractors).forEach(([specialty, contractor]) => {
+        if (!contractor) return;
+        
+        if (!contractorToLocations[contractor]) {
+          contractorToLocations[contractor] = [];
+        }
+        
+        // Add this location to the contractor's worked locations
+        const locationData = {
+          company: project.company,
+          location: project.location,
+          companyNormalized: company.normalized,
+          tier: company.tier,
+          specialty: specialty,
+          projectValue: this.parseValuation(project.valuation),
+          projectName: project.job
+        };
+        
+        // Avoid duplicates
+        const exists = contractorToLocations[contractor].some(loc => 
+          loc.company === locationData.company && 
+          loc.location === locationData.location
+        );
+        
+        if (!exists) {
+          contractorToLocations[contractor].push(locationData);
+        }
+      });
     });
     
-    // Find contractors who share clients
-    const contractors = Object.keys(contractorToCompanies);
+    // Find contractors who share clients or work at different locations of the same company
+    const contractors = Object.keys(contractorToLocations);
     
     for (let i = 0; i < contractors.length; i++) {
       for (let j = i + 1; j < contractors.length; j++) {
         const contractorA = contractors[i];
         const contractorB = contractors[j];
         
-        const companiesA = contractorToCompanies[contractorA];
-        const companiesB = contractorToCompanies[contractorB];
+        const locationsA = contractorToLocations[contractorA] || [];
+        const locationsB = contractorToLocations[contractorB] || [];
         
-        // Find shared clients
-        const sharedCompanies = companiesA.filter(compA => 
-          companiesB.some(compB => compB.company === compA.company)
-        );
+        // Find shared companies (where they work at different locations)
+        const sharedCompaniesMap = {};
         
-        // Find unique clients (where they could introduce each other)
-        const uniqueToA = companiesA.filter(compA => 
-          !companiesB.some(compB => compB.company === compA.company)
-        );
+        locationsA.forEach(locA => {
+          const matchingB = locationsB.filter(locB => 
+            locB.company === locA.company
+          );
+          
+          if (matchingB.length > 0) {
+            if (!sharedCompaniesMap[locA.company]) {
+              sharedCompaniesMap[locA.company] = {
+                company: locA.company,
+                tier: locA.tier,
+                aLocations: [],
+                bLocations: [],
+                aSpecialties: new Set(),
+                bSpecialties: new Set()
+              };
+            }
+            
+            sharedCompaniesMap[locA.company].aLocations.push(locA);
+            sharedCompaniesMap[locA.company].aSpecialties.add(locA.specialty);
+            
+            matchingB.forEach(locB => {
+              sharedCompaniesMap[locA.company].bLocations.push(locB);
+              sharedCompaniesMap[locA.company].bSpecialties.add(locB.specialty);
+            });
+          }
+        });
         
-        const uniqueToB = companiesB.filter(compB => 
-          !companiesA.some(compA => compA.company === compB.company)
-        );
+        // Convert to array and process shared companies
+        const sharedCompanies = Object.values(sharedCompaniesMap).map(item => ({
+          company: item.company,
+          tier: item.tier,
+          aLocations: [...new Map(item.aLocations.map(l => [l.location, l])).values()],
+          bLocations: [...new Map(item.bLocations.map(l => [l.location, l])).values()],
+          aSpecialties: Array.from(item.aSpecialties),
+          bSpecialties: Array.from(item.bSpecialties)
+        }));
         
-        // Create connection opportunity if there are shared or unique clients
+        // Find companies where A worked but B didn't
+        const uniqueToA = [];
+        locationsA.forEach(locA => {
+          const bHasCompany = locationsB.some(locB => locB.company === locA.company);
+          if (!bHasCompany) {
+            const existing = uniqueToA.find(item => item.company === locA.company);
+            if (!existing) {
+              uniqueToA.push({
+                company: locA.company,
+                tier: locA.tier,
+                locations: [locA],
+                specialties: [locA.specialty]
+              });
+            } else {
+              const locationExists = existing.locations.some(l => l.location === locA.location);
+              if (!locationExists) {
+                existing.locations.push(locA);
+              }
+              if (!existing.specialties.includes(locA.specialty)) {
+                existing.specialties.push(locA.specialty);
+              }
+            }
+          }
+        });
+        
+        // Find companies where B worked but A didn't
+        const uniqueToB = [];
+        locationsB.forEach(locB => {
+          const aHasCompany = locationsA.some(locA => locA.company === locB.company);
+          if (!aHasCompany) {
+            const existing = uniqueToB.find(item => item.company === locB.company);
+            if (!existing) {
+              uniqueToB.push({
+                company: locB.company,
+                tier: locB.tier,
+                locations: [locB],
+                specialties: [locB.specialty]
+              });
+            } else {
+              const locationExists = existing.locations.some(l => l.location === locB.location);
+              if (!locationExists) {
+                existing.locations.push(locB);
+              }
+              if (!existing.specialties.includes(locB.specialty)) {
+                existing.specialties.push(locB.specialty);
+              }
+            }
+          }
+        });
+        
+        // Create connection opportunity if there are shared companies or unique opportunities
         if (sharedCompanies.length > 0 || (uniqueToA.length > 0 && uniqueToB.length > 0)) {
-          const specialtiesA = [...new Set(companiesA.map(c => c.specialty))];
-          const specialtiesB = [...new Set(companiesB.map(c => c.specialty))];
+          const allSpecialtiesA = [...new Set(locationsA.map(l => l.specialty))];
+          const allSpecialtiesB = [...new Set(locationsB.map(l => l.specialty))];
           
           connections.push({
             contractorA,
             contractorB,
-            sharedClients: sharedCompanies,
-            aCanIntroduce: uniqueToA,
-            bCanIntroduce: uniqueToB,
-            specialtiesA,
-            specialtiesB,
-            potentialValue: this.calculateConnectionValue(sharedCompanies, uniqueToA, uniqueToB),
-            type: this.determineConnectionType(sharedCompanies, uniqueToA, uniqueToB, specialtiesA, specialtiesB)
+            sharedCompanies,  // Companies where both work but at different locations
+            aCanIntroduce: uniqueToA,  // Companies/locations only A has worked at
+            bCanIntroduce: uniqueToB,  // Companies/locations only B has worked at
+            specialtiesA: allSpecialtiesA,
+            specialtiesB: allSpecialtiesB,
+            potentialValue: this.calculateLocationConnectionValue(sharedCompanies, uniqueToA, uniqueToB),
+            type: this.determineLocationConnectionType(sharedCompanies, uniqueToA, uniqueToB, allSpecialtiesA, allSpecialtiesB)
           });
         }
       }
@@ -304,45 +387,52 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Calculate potential value of a contractor connection
+   * Calculate potential value of a location-based contractor connection
    */
-  calculateConnectionValue(shared, uniqueA, uniqueB) {
+  calculateLocationConnectionValue(sharedCompanies, uniqueA, uniqueB) {
     const tierValues = { 'Enterprise': 100, 'Large': 75, 'Mid': 50, 'Small': 25 };
     
     let value = 0;
     
-    // Shared clients = strong relationship building opportunity
-    shared.forEach(client => {
-      value += (tierValues[client.tier] || 25) * 2;
+    // Shared companies = strong relationship building opportunity
+    // Value increases with number of different locations
+    sharedCompanies.forEach(item => {
+      const baseValue = tierValues[item.tier] || 25;
+      const locationCount = item.aLocations.length + item.bLocations.length;
+      value += baseValue * locationCount * 2;  // High multiplier for shared clients
     });
     
-    // Unique clients = introduction opportunities
-    uniqueA.forEach(client => {
-      value += tierValues[client.tier] || 25;
+    // Unique companies = introduction opportunities
+    uniqueA.forEach(item => {
+      const baseValue = tierValues[item.tier] || 25;
+      value += baseValue * item.locations.length;
     });
     
-    uniqueB.forEach(client => {
-      value += tierValues[client.tier] || 25;
+    uniqueB.forEach(item => {
+      const baseValue = tierValues[item.tier] || 25;
+      value += baseValue * item.locations.length;
     });
     
     return value;
   },
 
   /**
-   * Determine the type of connection opportunity
+   * Determine the type of location-based connection opportunity
    */
-  determineConnectionType(shared, uniqueA, uniqueB, specialtiesA, specialtiesB) {
-    const hasShared = shared.length > 0;
+  determineLocationConnectionType(sharedCompanies, uniqueA, uniqueB, specialtiesA, specialtiesB) {
+    const hasShared = sharedCompanies.length > 0;
     const hasUniqueA = uniqueA.length > 0;
     const hasUniqueB = uniqueB.length > 0;
     const sameSpecialty = specialtiesA.some(s => specialtiesB.includes(s));
     
-    if (hasShared && !sameSpecialty) {
-      return 'Cross-Selling Partners';
+    if (hasShared && sharedCompanies.length >= 2) {
+      return 'Multi-Location Partners';
+    } else if (hasShared && !sameSpecialty) {
+      return 'Cross-Trade Coordination';
     } else if (hasShared && sameSpecialty) {
-      return 'Collaboration Opportunity';
+      return 'Same-Trade Collaboration';
     } else if (hasUniqueA && hasUniqueB) {
-      return 'Mutual Introduction';
+      return 'Location Introduction Swap';
     } else {
       return 'Networking Opportunity';
     }
@@ -576,7 +666,7 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Render Contractor Connection View
+   * Render Contractor Connection View - LOCATION-BASED VERSION
    */
   renderConnectionView() {
     const container = document.getElementById('company-matrix-container');
@@ -603,7 +693,7 @@ const CompanyMatrixComponent = {
       <div class="relationship-header" style="margin-bottom: 24px;">
         <h3 style="margin: 0; margin-bottom: 8px;">🔗 Make a Connection</h3>
         <p style="color: var(--text-secondary); margin: 0;">
-          Identify contractors who should meet each other based on shared or complementary clients
+          Identify contractors working at different locations of the same companies - perfect for coordination and introductions
         </p>
       </div>
       
@@ -639,42 +729,72 @@ const CompanyMatrixComponent = {
             </div>
           </div>
           
-          ${conn.sharedClients.length > 0 ? `
-            <div style="margin-bottom: 16px; padding: 12px; background: rgba(16, 185, 129, 0.05); border-radius: 8px;">
-              <div style="font-weight: 600; margin-bottom: 8px; color: var(--success-color);">
-                🤝 Shared Clients (${conn.sharedClients.length})
+          ${conn.sharedCompanies.length > 0 ? `
+            <div style="margin-bottom: 16px; padding: 16px; background: rgba(16, 185, 129, 0.08); border-radius: 8px; border: 2px solid rgba(16, 185, 129, 0.2);">
+              <div style="font-weight: 600; margin-bottom: 12px; color: var(--success-color); font-size: 15px;">
+                🤝 Working at Different Locations of ${conn.sharedCompanies.length} Shared ${conn.sharedCompanies.length === 1 ? 'Company' : 'Companies'}
               </div>
-              <div style="font-size: 13px; line-height: 1.6; display: flex; flex-wrap: wrap; gap: 8px;">
-                ${conn.sharedClients.map(client => `
-                  <span class="badge badge-success" style="font-size: 12px;">
-                    ${client.company} <span style="opacity: 0.7;">(${formatSpecialty(client.specialty)})</span>
-                  </span>
-                `).join('')}
-              </div>
-              <div style="margin-top: 8px; font-size: 12px; color: var(--text-secondary); font-style: italic;">
-                ${conn.type === 'Cross-Selling Partners' ? 
-                  'These contractors work with the same clients in different specialties - perfect for cross-selling!' :
-                  'Strong foundation for collaboration on shared accounts'}
+              ${conn.sharedCompanies.map(shared => `
+                <div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 6px; border-left: 3px solid var(--success-color);">
+                  <div style="font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    <span>${shared.company}</span>
+                    <span class="badge badge-secondary" style="font-size: 10px;">${shared.tier}</span>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+                    <div style="padding: 8px; background: rgba(99, 102, 241, 0.05); border-radius: 4px;">
+                      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">
+                        ${conn.contractorA} locations:
+                      </div>
+                      ${shared.aLocations.map(loc => `
+                        <div style="font-size: 12px; margin-top: 4px;">
+                          • ${loc.location} <span style="color: var(--text-muted); font-size: 10px;">(${formatSpecialty(loc.specialty)})</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                    <div style="padding: 8px; background: rgba(139, 92, 246, 0.05); border-radius: 4px;">
+                      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">
+                        ${conn.contractorB} locations:
+                      </div>
+                      ${shared.bLocations.map(loc => `
+                        <div style="font-size: 12px; margin-top: 4px;">
+                          • ${loc.location} <span style="color: var(--text-muted); font-size: 10px;">(${formatSpecialty(loc.specialty)})</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+              <div style="margin-top: 8px; padding: 8px; background: rgba(16, 185, 129, 0.05); border-radius: 4px;">
+                <div style="font-size: 12px; color: var(--text-secondary); font-style: italic;">
+                  💡 <strong>Key Insight:</strong> These contractors are working at different locations of the same ${conn.sharedCompanies.length === 1 ? 'company' : 'companies'}. 
+                  They should coordinate on best practices, pricing strategies, and potential referrals between locations.
+                </div>
               </div>
             </div>
           ` : ''}
           
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
             ${conn.aCanIntroduce.length > 0 ? `
-              <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-radius: 8px;">
+              <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
                 <div style="font-weight: 600; margin-bottom: 8px; color: var(--primary-color);">
-                  ${conn.contractorA} can introduce to:
+                  ${conn.contractorA} can introduce to (${conn.aCanIntroduce.length} ${conn.aCanIntroduce.length === 1 ? 'company' : 'companies'}):
                 </div>
                 <div style="font-size: 13px; line-height: 1.6;">
-                  ${conn.aCanIntroduce.slice(0, 5).map(client => `
-                    <div style="margin-bottom: 4px;">
-                      • ${client.company} 
-                      <span style="font-size: 11px; color: var(--text-muted);">(${client.tier}, ${formatSpecialty(client.specialty)})</span>
+                  ${conn.aCanIntroduce.slice(0, 3).map(item => `
+                    <div style="margin-bottom: 8px; padding: 6px; background: white; border-radius: 4px;">
+                      <div style="font-weight: 600; font-size: 12px;">
+                        ${item.company}
+                        <span class="badge badge-secondary" style="font-size: 10px; margin-left: 4px;">${item.tier}</span>
+                      </div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                        ${item.locations.length} location${item.locations.length > 1 ? 's' : ''}: 
+                        ${item.locations.slice(0, 2).map(l => l.location).join(', ')}${item.locations.length > 2 ? '...' : ''}
+                      </div>
                     </div>
                   `).join('')}
-                  ${conn.aCanIntroduce.length > 5 ? `
-                    <div style="font-size: 11px; color: var(--primary-color); margin-top: 6px;">
-                      +${conn.aCanIntroduce.length - 5} more companies
+                  ${conn.aCanIntroduce.length > 3 ? `
+                    <div style="font-size: 11px; color: var(--primary-color); margin-top: 6px; font-weight: 600;">
+                      +${conn.aCanIntroduce.length - 3} more companies
                     </div>
                   ` : ''}
                 </div>
@@ -682,20 +802,26 @@ const CompanyMatrixComponent = {
             ` : '<div></div>'}
             
             ${conn.bCanIntroduce.length > 0 ? `
-              <div style="padding: 12px; background: rgba(139, 92, 246, 0.05); border-radius: 8px;">
+              <div style="padding: 12px; background: rgba(139, 92, 246, 0.05); border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.2);">
                 <div style="font-weight: 600; margin-bottom: 8px; color: var(--purple-color, var(--primary-color));">
-                  ${conn.contractorB} can introduce to:
+                  ${conn.contractorB} can introduce to (${conn.bCanIntroduce.length} ${conn.bCanIntroduce.length === 1 ? 'company' : 'companies'}):
                 </div>
                 <div style="font-size: 13px; line-height: 1.6;">
-                  ${conn.bCanIntroduce.slice(0, 5).map(client => `
-                    <div style="margin-bottom: 4px;">
-                      • ${client.company} 
-                      <span style="font-size: 11px; color: var(--text-muted);">(${client.tier}, ${formatSpecialty(client.specialty)})</span>
+                  ${conn.bCanIntroduce.slice(0, 3).map(item => `
+                    <div style="margin-bottom: 8px; padding: 6px; background: white; border-radius: 4px;">
+                      <div style="font-weight: 600; font-size: 12px;">
+                        ${item.company}
+                        <span class="badge badge-secondary" style="font-size: 10px; margin-left: 4px;">${item.tier}</span>
+                      </div>
+                      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                        ${item.locations.length} location${item.locations.length > 1 ? 's' : ''}: 
+                        ${item.locations.slice(0, 2).map(l => l.location).join(', ')}${item.locations.length > 2 ? '...' : ''}
+                      </div>
                     </div>
                   `).join('')}
-                  ${conn.bCanIntroduce.length > 5 ? `
-                    <div style="font-size: 11px; color: var(--primary-color); margin-top: 6px;">
-                      +${conn.bCanIntroduce.length - 5} more companies
+                  ${conn.bCanIntroduce.length > 3 ? `
+                    <div style="font-size: 11px; color: var(--primary-color); margin-top: 6px; font-weight: 600;">
+                      +${conn.bCanIntroduce.length - 3} more companies
                     </div>
                   ` : ''}
                 </div>
@@ -706,7 +832,7 @@ const CompanyMatrixComponent = {
           <div style="padding: 12px; background: var(--background-alt); border-radius: 6px; margin-bottom: 12px;">
             <div style="font-size: 13px; color: var(--text-secondary);">
               <strong>💡 Why Connect:</strong> 
-              ${this.generateConnectionReason(conn)}
+              ${this.generateLocationConnectionReason(conn)}
             </div>
           </div>
           
@@ -714,7 +840,7 @@ const CompanyMatrixComponent = {
             <button class="btn btn-sm btn-primary" onclick="CompanyMatrixComponent.createContractorIntro('${conn.contractorA}', '${conn.contractorB}')">
               📧 Draft Introduction
             </button>
-            <button class="btn btn-sm btn-ghost" onclick="CompanyMatrixComponent.viewConnectionDetails('${conn.contractorA}', '${conn.contractorB}')">
+            <button class="btn btn-sm btn-ghost" onclick="CompanyMatrixComponent.viewLocationConnectionDetails('${conn.contractorA}', '${conn.contractorB}')">
               View Full Details
             </button>
           </div>
@@ -728,15 +854,20 @@ const CompanyMatrixComponent = {
   },
 
   /**
-   * Generate connection reason
+   * Generate connection reason - LOCATION-BASED
    */
-  generateConnectionReason(conn) {
-    if (conn.type === 'Cross-Selling Partners') {
-      return `${conn.contractorA} and ${conn.contractorB} both work with ${conn.sharedClients[0].company}${conn.sharedClients.length > 1 ? ` and ${conn.sharedClients.length - 1} other shared clients` : ''}. They could cross-sell services and coordinate on projects together.`;
-    } else if (conn.type === 'Collaboration Opportunity') {
-      return `These contractors work in similar specialties with shared clients. They could collaborate on larger projects and share best practices.`;
-    } else if (conn.type === 'Mutual Introduction') {
-      return `${conn.contractorA} knows ${conn.aCanIntroduce.length} companies that ${conn.contractorB} doesn't work with, and vice versa. Perfect opportunity for mutual client introductions.`;
+  generateLocationConnectionReason(conn) {
+    if (conn.type === 'Multi-Location Partners') {
+      const totalLocations = conn.sharedCompanies.reduce((sum, company) => 
+        sum + company.aLocations.length + company.bLocations.length, 0
+      );
+      return `${conn.contractorA} and ${conn.contractorB} are working at ${totalLocations} different locations across ${conn.sharedCompanies.length} shared ${conn.sharedCompanies.length === 1 ? 'company' : 'companies'}. They should coordinate strategies, share lessons learned, and potentially cross-refer between locations.`;
+    } else if (conn.type === 'Cross-Trade Coordination') {
+      return `These contractors work in different trades at locations of ${conn.sharedCompanies[0].company}. Perfect opportunity to coordinate on multi-trade projects and ensure seamless execution across locations.`;
+    } else if (conn.type === 'Same-Trade Collaboration') {
+      return `These contractors work in the same trade at different locations of ${conn.sharedCompanies[0].company}. They should share best practices, coordinate pricing, and potentially team up on larger multi-location projects.`;
+    } else if (conn.type === 'Location Introduction Swap') {
+      return `${conn.contractorA} has relationships at ${conn.aCanIntroduce.length} ${conn.aCanIntroduce.length === 1 ? 'company' : 'companies'} that ${conn.contractorB} doesn't, and vice versa. Perfect opportunity for mutual introductions to expand their networks.`;
     } else {
       return `These contractors could benefit from knowing each other for future collaboration and networking opportunities.`;
     }
@@ -827,16 +958,16 @@ This relationship offers strong potential for:
       return;
     }
     
-    const sharedClientsText = conn.sharedClients.length > 0 
-      ? `\n\nYou both work with: ${conn.sharedClients.map(c => c.company).join(', ')}.`
+    const sharedText = conn.sharedCompanies.length > 0 
+      ? `\n\nYou're both working at different locations of ${conn.sharedCompanies.map(s => s.company).join(', ')}. This presents great opportunities for coordination and knowledge sharing.`
       : '';
     
     const introAText = conn.aCanIntroduce.length > 0
-      ? `\n\n${conn.contractorA} works with: ${conn.aCanIntroduce.slice(0, 3).map(c => c.company).join(', ')}${conn.aCanIntroduce.length > 3 ? ' and others' : ''}.`
+      ? `\n\n${conn.contractorA} has relationships at: ${conn.aCanIntroduce.slice(0, 3).map(c => c.company).join(', ')}${conn.aCanIntroduce.length > 3 ? ' and others' : ''}.`
       : '';
     
     const introBText = conn.bCanIntroduce.length > 0
-      ? `\n${conn.contractorB} works with: ${conn.bCanIntroduce.slice(0, 3).map(c => c.company).join(', ')}${conn.bCanIntroduce.length > 3 ? ' and others' : ''}.`
+      ? `\n${conn.contractorB} has relationships at: ${conn.bCanIntroduce.slice(0, 3).map(c => c.company).join(', ')}${conn.bCanIntroduce.length > 3 ? ' and others' : ''}.`
       : '';
     
     const emailTemplate = `
@@ -844,12 +975,12 @@ Subject: Introduction: ${contractorA} ↔ ${contractorB}
 
 Hi [Contact A] and [Contact B],
 
-I wanted to introduce you two as I think there could be valuable synergies between ${contractorA} and ${contractorB}.${sharedClientsText}${introAText}${introBText}
+I wanted to introduce you two as I think there could be valuable synergies between ${contractorA} and ${contractorB}.${sharedText}${introAText}${introBText}
 
-Given your complementary specialties and client bases, I thought you might benefit from:
-- Coordinating on shared client projects
-- Cross-selling your respective services
-- Sharing insights and best practices
+Given your complementary work locations and specialties, I thought you might benefit from:
+- Coordinating on multi-location projects
+- Sharing best practices and lessons learned
+- Cross-referring between your respective locations
 - Exploring collaboration opportunities
 
 Would you both be open to a brief call to explore how you might work together?
@@ -862,9 +993,9 @@ Best regards,
   },
 
   /**
-   * View connection details
+   * View location-based connection details
    */
-  viewConnectionDetails(contractorA, contractorB) {
+  viewLocationConnectionDetails(contractorA, contractorB) {
     const conn = this.state.connectionData.find(c => 
       (c.contractorA === contractorA && c.contractorB === contractorB) ||
       (c.contractorA === contractorB && c.contractorB === contractorA)
@@ -886,28 +1017,42 @@ Best regards,
       return names[spec] || spec;
     };
     
-    let details = `Connection Analysis: ${contractorA} ↔ ${contractorB}\n\nType: ${conn.type}\nConnection Score: ${conn.potentialValue}\n\n`;
+    let details = `Location-Based Connection Analysis\n${contractorA} ↔ ${contractorB}\n\nType: ${conn.type}\nConnection Score: ${conn.potentialValue}\n\n`;
     
-    if (conn.sharedClients.length > 0) {
-      details += `SHARED CLIENTS (${conn.sharedClients.length}):\n`;
-      conn.sharedClients.forEach(client => {
-        details += `• ${client.company} - ${client.tier} (${formatSpecialty(client.specialty)})\n`;
+    if (conn.sharedCompanies.length > 0) {
+      details += `WORKING AT DIFFERENT LOCATIONS OF SHARED COMPANIES (${conn.sharedCompanies.length}):\n\n`;
+      conn.sharedCompanies.forEach(shared => {
+        details += `${shared.company} (${shared.tier}):\n`;
+        details += `  ${contractorA} locations:\n`;
+        shared.aLocations.forEach(loc => {
+          details += `    • ${loc.location} (${formatSpecialty(loc.specialty)})\n`;
+        });
+        details += `  ${contractorB} locations:\n`;
+        shared.bLocations.forEach(loc => {
+          details += `    • ${loc.location} (${formatSpecialty(loc.specialty)})\n`;
+        });
+        details += '\n';
       });
-      details += '\n';
     }
     
     if (conn.aCanIntroduce.length > 0) {
-      details += `${contractorA} CAN INTRODUCE TO:\n`;
-      conn.aCanIntroduce.forEach(client => {
-        details += `• ${client.company} - ${client.tier} (${formatSpecialty(client.specialty)})\n`;
+      details += `${contractorA.toUpperCase()} CAN INTRODUCE TO:\n`;
+      conn.aCanIntroduce.forEach(item => {
+        details += `${item.company} (${item.tier}) - ${item.locations.length} location(s):\n`;
+        item.locations.forEach(loc => {
+          details += `  • ${loc.location} (${formatSpecialty(loc.specialty)})\n`;
+        });
       });
       details += '\n';
     }
     
     if (conn.bCanIntroduce.length > 0) {
-      details += `${contractorB} CAN INTRODUCE TO:\n`;
-      conn.bCanIntroduce.forEach(client => {
-        details += `• ${client.company} - ${client.tier} (${formatSpecialty(client.specialty)})\n`;
+      details += `${contractorB.toUpperCase()} CAN INTRODUCE TO:\n`;
+      conn.bCanIntroduce.forEach(item => {
+        details += `${item.company} (${item.tier}) - ${item.locations.length} location(s):\n`;
+        item.locations.forEach(loc => {
+          details += `  • ${loc.location} (${formatSpecialty(loc.specialty)})\n`;
+        });
       });
     }
     
@@ -1682,4 +1827,4 @@ Best regards,
 // Make available globally
 window.CompanyMatrixComponent = CompanyMatrixComponent;
 
-console.log('📊 Enhanced Company Matrix Component loaded');
+console.log('📊 Enhanced Company Matrix Component loaded (LOCATION-BASED VERSION)');
