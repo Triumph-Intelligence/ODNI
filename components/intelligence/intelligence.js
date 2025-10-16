@@ -155,7 +155,10 @@ const IntelligenceComponent = {
         <tr>
           <td>
             <div style="display: flex; align-items: center; gap: 8px;">
-              <strong>${company.name}</strong>
+              <strong style="cursor: pointer; color: var(--primary-color);" 
+                      onclick="IntelligenceComponent.showCompanyMap('${company.normalized}')">
+                ${company.name}
+              </strong>
               <span class="badge ${coverageBadge}" style="font-size: 10px;">
                 ${coverageScore}/5
               </span>
@@ -174,6 +177,310 @@ const IntelligenceComponent = {
     }).join('');
     
     tbody.innerHTML = rows;
+  },
+
+  /**
+   * Show company map with all companies
+   */
+  showCompanyMap(companyId) {
+    const selectedCompany = this.state.companies.find(c => c.normalized === companyId);
+    if (!selectedCompany) return;
+    
+    // Create modal
+    const modal = this.createMapModal(selectedCompany);
+    document.body.appendChild(modal);
+    
+    // Draw the map
+    this.drawUSMap(selectedCompany);
+    
+    // Show modal
+    modal.style.display = 'block';
+    modal.classList.add('active');
+  },
+
+  /**
+   * Create map modal
+   */
+  createMapModal(selectedCompany) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('company-map-modal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'company-map-modal';
+    modal.className = 'modal-backdrop active';
+    modal.innerHTML = `
+      <div class="modal active" style="max-width: 1200px; width: 90%; max-height: 90vh;">
+        <div class="modal-header">
+          <h3 class="modal-title">US Company Coverage Map - ${selectedCompany.name}</h3>
+          <button class="modal-close" onclick="IntelligenceComponent.closeMapModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+          <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 16px solid var(--success-color);"></div>
+              <span style="font-size: 14px; font-weight: 600;">Companies We Work With</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 16px solid var(--error-color);"></div>
+              <span style="font-size: 14px; font-weight: 600;">Potential Opportunities</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 16px solid var(--primary-color); border: 3px solid var(--primary-color);"></div>
+              <span style="font-size: 14px; font-weight: 600;">${selectedCompany.name} (Selected)</span>
+            </div>
+          </div>
+          
+          <svg id="us-map-svg" width="100%" height="600" viewBox="0 0 900 500" style="background: var(--background-alt); border-radius: 8px;">
+            <!-- Map will be drawn here -->
+          </svg>
+          
+          <div id="company-stats" style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+            <!-- Stats will be added here -->
+          </div>
+        </div>
+      </div>
+    `;
+    
+    return modal;
+  },
+
+  /**
+   * Draw US map with company markers
+   */
+  drawUSMap(selectedCompany) {
+    const svg = document.getElementById('us-map-svg');
+    if (!svg) return;
+    
+    // Simple US state coordinates (approximate centers for continental 48 states)
+    const stateCoordinates = {
+      'AL': { x: 650, y: 350 },
+      'AZ': { x: 250, y: 350 },
+      'AR': { x: 550, y: 340 },
+      'CA': { x: 100, y: 250 },
+      'CO': { x: 380, y: 260 },
+      'CT': { x: 820, y: 180 },
+      'DE': { x: 800, y: 230 },
+      'FL': { x: 700, y: 420 },
+      'GA': { x: 680, y: 350 },
+      'ID': { x: 250, y: 150 },
+      'IL': { x: 600, y: 250 },
+      'IN': { x: 640, y: 250 },
+      'IA': { x: 550, y: 210 },
+      'KS': { x: 480, y: 280 },
+      'KY': { x: 650, y: 290 },
+      'LA': { x: 580, y: 400 },
+      'ME': { x: 850, y: 100 },
+      'MD': { x: 780, y: 230 },
+      'MA': { x: 840, y: 160 },
+      'MI': { x: 650, y: 180 },
+      'MN': { x: 550, y: 120 },
+      'MS': { x: 600, y: 380 },
+      'MO': { x: 550, y: 280 },
+      'MT': { x: 350, y: 100 },
+      'NE': { x: 480, y: 220 },
+      'NV': { x: 180, y: 240 },
+      'NH': { x: 840, y: 130 },
+      'NJ': { x: 800, y: 210 },
+      'NM': { x: 350, y: 350 },
+      'NY': { x: 780, y: 150 },
+      'NC': { x: 740, y: 310 },
+      'ND': { x: 480, y: 100 },
+      'OH': { x: 700, y: 230 },
+      'OK': { x: 480, y: 340 },
+      'OR': { x: 120, y: 120 },
+      'PA': { x: 760, y: 200 },
+      'RI': { x: 840, y: 180 },
+      'SC': { x: 730, y: 340 },
+      'SD': { x: 480, y: 160 },
+      'TN': { x: 650, y: 320 },
+      'TX': { x: 480, y: 400 },
+      'UT': { x: 280, y: 260 },
+      'VT': { x: 820, y: 120 },
+      'VA': { x: 760, y: 280 },
+      'WA': { x: 120, y: 60 },
+      'WV': { x: 730, y: 250 },
+      'WI': { x: 600, y: 160 },
+      'WY': { x: 370, y: 180 }
+    };
+    
+    // Clear existing content
+    svg.innerHTML = '';
+    
+    // Draw state boundaries (simplified)
+    const statesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    statesGroup.setAttribute('id', 'states');
+    
+    // Draw state circles and labels
+    Object.entries(stateCoordinates).forEach(([state, coords]) => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', coords.x);
+      circle.setAttribute('cy', coords.y);
+      circle.setAttribute('r', '15');
+      circle.setAttribute('fill', 'var(--background)');
+      circle.setAttribute('stroke', 'var(--border)');
+      circle.setAttribute('stroke-width', '1');
+      circle.setAttribute('opacity', '0.8');
+      statesGroup.appendChild(circle);
+      
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', coords.x);
+      text.setAttribute('y', coords.y + 5);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-size', '12');
+      text.setAttribute('fill', 'var(--text-secondary)');
+      text.textContent = state;
+      statesGroup.appendChild(text);
+    });
+    
+    svg.appendChild(statesGroup);
+    
+    // Group companies by state and contractor status
+    const companiesByState = {};
+    const stats = {
+      withContractors: 0,
+      withoutContractors: 0,
+      selected: 1
+    };
+    
+    this.state.companies.forEach(company => {
+      if (!company.hq_state || !stateCoordinates[company.hq_state]) return;
+      
+      if (!companiesByState[company.hq_state]) {
+        companiesByState[company.hq_state] = {
+          withContractors: [],
+          withoutContractors: []
+        };
+      }
+      
+      const hasContractors = Object.values(company.contractors || {}).some(c => c);
+      
+      if (hasContractors) {
+        companiesByState[company.hq_state].withContractors.push(company);
+        stats.withContractors++;
+      } else {
+        companiesByState[company.hq_state].withoutContractors.push(company);
+        stats.withoutContractors++;
+      }
+    });
+    
+    // Draw arrows for each state with companies
+    const arrowsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    arrowsGroup.setAttribute('id', 'arrows');
+    
+    Object.entries(companiesByState).forEach(([state, companies]) => {
+      const coords = stateCoordinates[state];
+      const isSelectedState = selectedCompany.hq_state === state;
+      
+      // Position arrows around the state
+      let offset = 0;
+      
+      // Draw arrows for companies with contractors (green)
+      companies.withContractors.forEach((company, i) => {
+        const isSelected = company.normalized === selectedCompany.normalized;
+        const angle = (offset * 45) * Math.PI / 180;
+        const distance = 35;
+        const x = coords.x + Math.cos(angle) * distance;
+        const y = coords.y + Math.sin(angle) * distance;
+        
+        this.drawArrow(arrowsGroup, x, y, coords.x, coords.y, 
+                      isSelected ? 'var(--primary-color)' : 'var(--success-color)',
+                      company.name, isSelected);
+        offset++;
+      });
+      
+      // Draw arrows for companies without contractors (red)
+      companies.withoutContractors.forEach((company, i) => {
+        const isSelected = company.normalized === selectedCompany.normalized;
+        const angle = (offset * 45) * Math.PI / 180;
+        const distance = 35;
+        const x = coords.x + Math.cos(angle) * distance;
+        const y = coords.y + Math.sin(angle) * distance;
+        
+        this.drawArrow(arrowsGroup, x, y, coords.x, coords.y,
+                      isSelected ? 'var(--primary-color)' : 'var(--error-color)',
+                      company.name, isSelected);
+        offset++;
+      });
+    });
+    
+    svg.appendChild(arrowsGroup);
+    
+    // Add statistics
+    const statsDiv = document.getElementById('company-stats');
+    if (statsDiv) {
+      statsDiv.innerHTML = `
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--success-color);">${stats.withContractors}</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">Active Relationships</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--error-color);">${stats.withoutContractors}</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">Potential Opportunities</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--primary-color);">${Object.keys(companiesByState).length}</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">States with Presence</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 16px;">
+          <div style="font-size: 24px; font-weight: bold; color: var(--primary-color);">${this.state.companies.length}</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">Total Companies</div>
+        </div>
+      `;
+    }
+  },
+
+  /**
+   * Draw an arrow pointing to a state
+   */
+  drawArrow(parent, x1, y1, x2, y2, color, label, isSelected) {
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.style.cursor = 'pointer';
+    
+    // Create arrow path
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    const arrowSize = isSelected ? 12 : 8;
+    const points = [
+      [x1, y1 - arrowSize],
+      [x1 - arrowSize/2, y1 + arrowSize/2],
+      [x1 + arrowSize/2, y1 + arrowSize/2]
+    ].map(p => p.join(',')).join(' ');
+    
+    arrow.setAttribute('points', points);
+    arrow.setAttribute('fill', color);
+    arrow.setAttribute('stroke', isSelected ? 'white' : color);
+    arrow.setAttribute('stroke-width', isSelected ? '2' : '0');
+    arrow.setAttribute('opacity', isSelected ? '1' : '0.8');
+    
+    // Add hover effect
+    group.addEventListener('mouseenter', () => {
+      arrow.setAttribute('opacity', '1');
+      arrow.setAttribute('transform', `scale(1.2)`);
+      arrow.style.transformOrigin = `${x1}px ${y1}px`;
+    });
+    
+    group.addEventListener('mouseleave', () => {
+      arrow.setAttribute('opacity', isSelected ? '1' : '0.8');
+      arrow.setAttribute('transform', 'scale(1)');
+    });
+    
+    // Add tooltip
+    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    title.textContent = label;
+    group.appendChild(title);
+    
+    group.appendChild(arrow);
+    parent.appendChild(group);
+  },
+
+  /**
+   * Close map modal
+   */
+  closeMapModal() {
+    const modal = document.getElementById('company-map-modal');
+    if (modal) {
+      modal.remove();
+    }
   },
 
   /**
