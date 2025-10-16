@@ -37,11 +37,11 @@ const CompanyMatrixComponent = {
       // Load data
       await this.loadData();
       
-      // Setup event listeners
-      this.setupEventListeners();
-      
-      // Add view mode buttons to the page
+      // ✅ FIXED: Add view mode buttons BEFORE setting up listeners
       this.addViewModeButtons();
+      
+      // ✅ FIXED: Setup event listeners AFTER buttons exist
+      this.setupEventListeners();
       
       console.log('✅ Company Matrix Component initialized');
     } catch (error) {
@@ -806,10 +806,10 @@ ${companyB} Coverage:
 ${rel.companyB === companyB ? rel.bStrength.map(s => '• ' + s).join('\n') : rel.aStrength.map(s => '• ' + s).join('\n')}
 
 This relationship offers strong potential for:
-• Geographic expansion opportunities
-• Cross-referral partnerships
-• Knowledge sharing
-• Joint business development
+- Geographic expansion opportunities
+- Cross-referral partnerships
+- Knowledge sharing
+- Joint business development
     `.trim());
   },
 
@@ -847,10 +847,10 @@ Hi [Contact A] and [Contact B],
 I wanted to introduce you two as I think there could be valuable synergies between ${contractorA} and ${contractorB}.${sharedClientsText}${introAText}${introBText}
 
 Given your complementary specialties and client bases, I thought you might benefit from:
-• Coordinating on shared client projects
-• Cross-selling your respective services
-• Sharing insights and best practices
-• Exploring collaboration opportunities
+- Coordinating on shared client projects
+- Cross-selling your respective services
+- Sharing insights and best practices
+- Exploring collaboration opportunities
 
 Would you both be open to a brief call to explore how you might work together?
 
