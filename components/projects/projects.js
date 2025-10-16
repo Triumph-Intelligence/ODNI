@@ -15,7 +15,7 @@ const ProjectsComponent = {
     filters: {
       search: '',
       company: '',
-      status: 'active'
+      status: 'all'
     },
     sortColumn: 'start',
     sortDirection: 'desc',
@@ -67,75 +67,44 @@ const ProjectsComponent = {
     // Apply any existing filters
     this.applyFilters();
     
-    // Render
+    // Render table
     this.renderTable();
-    this.renderStatistics();
-    this.renderTimeline();
   },
 
   /**
    * Setup event listeners
    */
   setupEventListeners() {
-    // Search input
-    const searchInput = document.getElementById('projects-search');
-    if (searchInput) {
-      searchInput.addEventListener('input', Utils.debounce((e) => {
-        this.state.filters.search = e.target.value.toLowerCase();
-        this.applyFilters();
-      }, 300));
-    }
-    
-    // Company filter
-    const companyFilter = document.getElementById('project-company-filter');
-    if (companyFilter) {
-      // Populate company options
-      companyFilter.innerHTML = `
-        <option value="">All Companies</option>
-        ${this.state.companies.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
-      `;
-      
-      companyFilter.addEventListener('change', (e) => {
-        this.state.filters.company = e.target.value;
-        this.applyFilters();
-      });
-    }
-    
-    // Status filter
-    const statusFilter = document.getElementById('project-status-filter');
-    if (statusFilter) {
-      statusFilter.addEventListener('change', (e) => {
-        this.state.filters.status = e.target.value;
-        this.applyFilters();
-      });
-    }
-    
     // Add Project button
     const addBtn = document.getElementById('add-project-btn');
     if (addBtn) {
       addBtn.addEventListener('click', () => this.showAddProjectModal());
     }
     
-    // Export button
-    const exportBtn = document.getElementById('export-projects-btn');
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => this.exportToCSV());
-    }
-    
-    // Sortable headers
-    document.querySelectorAll('#projects-table-body').forEach(tbody => {
-      const table = tbody.closest('table');
+    // Sortable headers - target the specific projects table
+    const projectsTable = document.querySelector('#projects-table-body');
+    if (projectsTable) {
+      const table = projectsTable.closest('table');
       if (table) {
-        table.querySelectorAll('th.sortable').forEach(th => {
-          th.style.cursor = 'pointer';
-          th.addEventListener('click', () => {
-            const column = th.dataset.column || 
-              th.textContent.toLowerCase().replace(/\s+/g, '_');
-            this.sortBy(column);
-          });
+        table.querySelectorAll('th').forEach((th, index) => {
+          // Make specific columns sortable
+          const headerText = th.textContent.trim();
+          if (headerText === 'Start Date' || headerText === 'End Date' || headerText === 'Valuation') {
+            th.style.cursor = 'pointer';
+            th.classList.add('sortable');
+            
+            th.addEventListener('click', () => {
+              let column = '';
+              if (headerText === 'Start Date') column = 'start';
+              else if (headerText === 'End Date') column = 'end';
+              else if (headerText === 'Valuation') column = 'valuation';
+              
+              if (column) this.sortBy(column);
+            });
+          }
         });
       }
-    });
+    }
   },
 
   /**
@@ -223,23 +192,12 @@ const ProjectsComponent = {
     
     this.state.filteredProjects = filtered;
     this.renderTable();
-    this.renderStatistics();
-    this.renderTimeline();
   },
 
   /**
    * Sort projects by column
    */
   sortBy(column) {
-    // Map column names
-    const columnMap = {
-      'start_date': 'start',
-      'end_date': 'end',
-      'valuation': 'valuation'
-    };
-    
-    column = columnMap[column] || column;
-    
     // Toggle direction if same column
     if (this.state.sortColumn === column) {
       this.state.sortDirection = this.state.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -290,15 +248,25 @@ const ProjectsComponent = {
    * Update sort indicators
    */
   updateSortIndicators() {
-    document.querySelectorAll('th.sortable').forEach(th => {
-      const column = th.dataset.column || 
-        th.textContent.toLowerCase().replace(/\s+/g, '_');
-      
+    const projectsTable = document.querySelector('#projects-table-body');
+    if (!projectsTable) return;
+    
+    const table = projectsTable.closest('table');
+    if (!table) return;
+    
+    table.querySelectorAll('th').forEach(th => {
+      // Remove all sort classes
       th.classList.remove('sorted-asc', 'sorted-desc');
       
-      if (column === this.state.sortColumn || 
-          (column === 'start_date' && this.state.sortColumn === 'start') ||
-          (column === 'end_date' && this.state.sortColumn === 'end')) {
+      const headerText = th.textContent.trim();
+      let column = '';
+      
+      if (headerText === 'Start Date') column = 'start';
+      else if (headerText === 'End Date') column = 'end';
+      else if (headerText === 'Valuation') column = 'valuation';
+      
+      // Add current sort class
+      if (column && column === this.state.sortColumn) {
         th.classList.add(`sorted-${this.state.sortDirection}`);
       }
     });
@@ -339,123 +307,6 @@ const ProjectsComponent = {
   },
 
   /**
-   * Render statistics
-   */
-  renderStatistics() {
-    const total = this.state.projects.length;
-    const inProgress = this.state.projects.filter(p => 
-      this.getProjectStatus(p) === 'In Progress'
-    ).length;
-    const completed = this.state.projects.filter(p => 
-      this.getProjectStatus(p) === 'Completed'
-    ).length;
-    const upcoming = this.state.projects.filter(p => 
-      this.getProjectStatus(p) === 'Not Started'
-    ).length;
-    
-    const totalValue = this.state.projects.reduce((sum, p) => 
-      sum + this.parseValuation(p.valuation), 0
-    );
-    
-    const activeValue = this.state.projects
-      .filter(p => this.getProjectStatus(p) === 'In Progress')
-      .reduce((sum, p) => sum + this.parseValuation(p.valuation), 0);
-    
-    // Find projects ending soon (within 30 days)
-    const today = new Date();
-    const thirtyDays = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const endingSoon = this.state.projects.filter(p => {
-      if (!p.end) return false;
-      const endDate = new Date(p.end);
-      return endDate >= today && endDate <= thirtyDays && 
-             this.getProjectStatus(p) === 'In Progress';
-    }).length;
-    
-    const statsContainer = document.getElementById('projects-stats');
-    if (statsContainer) {
-      statsContainer.innerHTML = `
-        <div class="card-grid" style="margin-bottom: 20px;">
-          <div class="card kpi-card">
-            <div class="kpi-value">${inProgress}</div>
-            <div class="kpi-label">Active Projects</div>
-          </div>
-          <div class="card kpi-card">
-            <div class="kpi-value">${this.formatValuation(activeValue)}</div>
-            <div class="kpi-label">Active Value</div>
-          </div>
-          <div class="card kpi-card">
-            <div class="kpi-value" style="color: var(--warning-color);">${endingSoon}</div>
-            <div class="kpi-label">Ending Soon</div>
-          </div>
-          <div class="card kpi-card">
-            <div class="kpi-value" style="color: var(--success-color);">${completed}</div>
-            <div class="kpi-label">Completed</div>
-          </div>
-        </div>
-      `;
-    }
-  },
-
-  /**
-   * Render timeline view
-   */
-  renderTimeline() {
-    const timelineContainer = document.getElementById('projects-timeline');
-    if (!timelineContainer) return;
-    
-    // Group projects by status
-    const activeProjects = this.state.filteredProjects.filter(p => 
-      this.getProjectStatus(p) === 'In Progress'
-    );
-    
-    if (activeProjects.length === 0) {
-      timelineContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No active projects</p>';
-      return;
-    }
-    
-    // Sort by end date
-    activeProjects.sort((a, b) => {
-      const aEnd = a.end ? new Date(a.end) : new Date('2099-12-31');
-      const bEnd = b.end ? new Date(b.end) : new Date('2099-12-31');
-      return aEnd - bEnd;
-    });
-    
-    const timeline = activeProjects.map(project => {
-      const progress = this.getProjectProgress(project);
-      const daysRemaining = this.getDaysRemaining(project);
-      const progressColor = progress >= 75 ? 'var(--warning-color)' : 
-                          progress >= 50 ? 'var(--info-color)' : 
-                          'var(--success-color)';
-      
-      return `
-        <div style="margin-bottom: 16px; padding: 12px; background: var(--background-alt); border-radius: var(--radius-lg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div>
-              <strong>${project.company}</strong> - ${project.job}
-              <div style="font-size: 11px; color: var(--text-muted);">
-                ${project.location} • ${this.formatValuation(project.valuation)}
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <strong>${progress}%</strong>
-              ${daysRemaining !== null ? `
-                <div style="font-size: 11px; color: ${daysRemaining < 15 ? 'var(--error-color)' : 'var(--text-muted)'};">
-                  ${daysRemaining} days left
-                </div>
-              ` : ''}
-            </div>
-          </div>
-          <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
-            <div style="width: ${progress}%; height: 100%; background: ${progressColor}; transition: width 0.3s ease;"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-    timelineContainer.innerHTML = timeline;
-  },
-
-  /**
    * Get days remaining
    */
   getDaysRemaining(project) {
@@ -473,15 +324,22 @@ const ProjectsComponent = {
    */
   renderTable() {
     const tbody = document.getElementById('projects-table-body');
-    if (!tbody) return;
+    if (!tbody) {
+      console.warn('Projects table body not found');
+      return;
+    }
     
     if (this.state.filteredProjects.length === 0) {
       tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No projects found</td></tr>`;
       return;
     }
     
+    // Build table rows
     const rows = this.state.filteredProjects.map(project => {
+      // Find company details
       const company = this.state.companies.find(c => c.name === project.company);
+      
+      // Find location details
       const location = this.state.locations.find(l => 
         l.name === project.location && l.company === company?.normalized
       );
@@ -607,6 +465,9 @@ const ProjectsComponent = {
     }).join('');
     
     tbody.innerHTML = rows;
+    
+    // Log success
+    console.log(`✅ Rendered ${this.state.filteredProjects.length} projects`);
   },
 
   /**
