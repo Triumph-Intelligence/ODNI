@@ -1,6 +1,5 @@
 /**
  * Enhanced Company Matrix Component
- * Now includes relationship intelligence, introduction opportunities, and contractor connections
  * LOCATION-BASED CONNECTION ANALYSIS WITH CLEAR CONTRACTOR VISIBILITY
  */
 
@@ -30,20 +29,19 @@ const CompanyMatrixComponent = {
    */
   async init() {
     console.log('📊 Company Matrix Component initializing...');
-    
     try {
       // Set current organization
       this.state.currentOrg = VisibilityService.getCurrentOrg();
-      
+
       // Load data
       await this.loadData();
-      
-      // ✅ FIXED: Add view mode buttons BEFORE setting up listeners
+
+      // Add view mode buttons BEFORE listeners
       this.addViewModeButtons();
-      
-      // ✅ FIXED: Setup event listeners AFTER buttons exist
+
+      // Setup listeners AFTER buttons exist
       this.setupEventListeners();
-      
+
       console.log('✅ Company Matrix Component initialized');
     } catch (error) {
       console.error('Error initializing Company Matrix Component:', error);
@@ -65,7 +63,7 @@ const CompanyMatrixComponent = {
       viewButtonGroup.id = 'view-mode-buttons';
       viewButtonGroup.className = 'btn-group';
       viewButtonGroup.style.cssText = 'margin-left: auto; display: flex; gap: 4px;';
-      
+
       viewButtonGroup.innerHTML = `
         <button id="view-cards" class="btn btn-sm btn-primary" title="Card View">
           <span style="font-size: 16px;">▦</span> Cards
@@ -80,7 +78,7 @@ const CompanyMatrixComponent = {
           <span style="font-size: 16px;">🔗</span> Connect
         </button>
       `;
-      
+
       controlsContainer.appendChild(viewButtonGroup);
     }
   },
@@ -95,50 +93,22 @@ const CompanyMatrixComponent = {
     const contacts = await DataService.getContacts();
     const projects = await DataService.getProjects();
     const opportunities = await DataService.getOpportunities();
-    
+
     // Apply visibility filters
     this.state.companies = VisibilityService.filterCompanies(companies, this.state.currentOrg);
     this.state.locations = VisibilityService.filterLocations(locations, companies, this.state.currentOrg);
     this.state.contacts = VisibilityService.filterContacts(contacts, companies, this.state.currentOrg);
     this.state.projects = VisibilityService.filterProjects(projects, companies, this.state.currentOrg);
     this.state.opportunities = VisibilityService.filterOpportunities(opportunities, companies, this.state.currentOrg);
-    
+
     // Analyze relationships
     this.analyzeRelationships();
-    
+
     // Analyze contractor connections (LOCATION-BASED)
     this.analyzeContractorConnections();
-    
+
     // Render based on view mode
     this.render();
-  },
-
-  /**
-   * Get contractors who worked at a specific location (based on actual projects)
-   */
-  getLocationContractors(company, location) {
-    const locationProjects = this.state.projects.filter(p => 
-      p.company === company.name && p.location === location.name
-    );
-    
-    if (locationProjects.length === 0) return [];
-    
-    // Get unique specialties from projects and map to contractors
-    const contractors = [];
-    const companyData = this.state.companies.find(c => c.name === company.name);
-    
-    if (companyData && companyData.contractors) {
-      Object.entries(companyData.contractors).forEach(([specialty, contractor]) => {
-        if (contractor) {
-          contractors.push({
-            name: contractor,
-            specialty: specialty
-          });
-        }
-      });
-    }
-    
-    return contractors;
   },
 
   /**
@@ -146,7 +116,7 @@ const CompanyMatrixComponent = {
    */
   analyzeRelationships() {
     const relationships = [];
-    
+
     // Group locations by state
     const locationsByState = {};
     this.state.locations.forEach(location => {
@@ -159,42 +129,42 @@ const CompanyMatrixComponent = {
         company: this.state.companies.find(c => c.normalized === location.company)
       });
     });
-    
+
     // Find companies with complementary geographic presence
     this.state.companies.forEach(companyA => {
       const companyALocations = this.state.locations.filter(l => l.company === companyA.normalized);
-      
+
       this.state.companies.forEach(companyB => {
         if (companyA.normalized >= companyB.normalized) return; // Avoid duplicates
-        
+
         const companyBLocations = this.state.locations.filter(l => l.company === companyB.normalized);
-        
+
         // Check for complementary coverage
         const aStates = new Set(companyALocations.map(l => l.state));
         const bStates = new Set(companyBLocations.map(l => l.state));
-        
+
         // Find where A is strong but B is weak
         const aStrongStates = [];
         const bStrongStates = [];
-        
+
         aStates.forEach(state => {
           const aCount = companyALocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyA, l)).length;
           const bCount = companyBLocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyB, l)).length;
-          
+
           if (aCount > 0 && bCount === 0) {
             aStrongStates.push(state);
           }
         });
-        
+
         bStates.forEach(state => {
           const bCount = companyBLocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyB, l)).length;
           const aCount = companyALocations.filter(l => l.state === state && this.hasWorkedAtLocation(companyA, l)).length;
-          
+
           if (bCount > 0 && aCount === 0) {
             bStrongStates.push(state);
           }
         });
-        
+
         // If there's complementary coverage, create a relationship
         if (aStrongStates.length > 0 && bStrongStates.length > 0) {
           relationships.push({
@@ -206,16 +176,16 @@ const CompanyMatrixComponent = {
             type: 'Geographic Complementarity'
           });
         }
-        
+
         // Check for same-state different-city opportunities
         const sharedStates = Array.from(aStates).filter(s => bStates.has(s));
         sharedStates.forEach(state => {
           const aCities = new Set(companyALocations.filter(l => l.state === state).map(l => l.city));
           const bCities = new Set(companyBLocations.filter(l => l.state === state).map(l => l.city));
-          
+
           const aOnlyCities = Array.from(aCities).filter(c => !bCities.has(c));
           const bOnlyCities = Array.from(bCities).filter(c => !aCities.has(c));
-          
+
           if (aOnlyCities.length > 0 && bOnlyCities.length > 0) {
             relationships.push({
               companyA: companyA.name,
@@ -229,7 +199,7 @@ const CompanyMatrixComponent = {
         });
       });
     });
-    
+
     this.state.relationshipData = relationships.sort((a, b) => b.potentialValue - a.potentialValue);
   },
 
@@ -241,7 +211,7 @@ const CompanyMatrixComponent = {
     const tierValues = { 'Enterprise': 100, 'Large': 75, 'Mid': 50, 'Small': 25 };
     const aValue = tierValues[companyA.tier] || 25;
     const bValue = tierValues[companyB.tier] || 25;
-    
+
     return (aValue + bValue) * (aStrength.length + bStrength.length);
   },
 
@@ -250,23 +220,23 @@ const CompanyMatrixComponent = {
    */
   analyzeContractorConnections() {
     const connections = [];
-    
+
     // Build a map of contractors to the LOCATIONS they've worked at
     const contractorToLocations = {};
-    
+
     // Analyze which contractors have worked at which locations (based on projects)
     this.state.projects.forEach(project => {
       const company = this.state.companies.find(c => c.name === project.company);
       if (!company || !company.contractors) return;
-      
+
       // Check which contractors are assigned to this company
       Object.entries(company.contractors).forEach(([specialty, contractor]) => {
         if (!contractor) return;
-        
+
         if (!contractorToLocations[contractor]) {
           contractorToLocations[contractor] = [];
         }
-        
+
         // Add this location to the contractor's worked locations
         const locationData = {
           company: project.company,
@@ -277,38 +247,38 @@ const CompanyMatrixComponent = {
           projectValue: this.parseValuation(project.valuation),
           projectName: project.job
         };
-        
+
         // Avoid duplicates
-        const exists = contractorToLocations[contractor].some(loc => 
-          loc.company === locationData.company && 
+        const exists = contractorToLocations[contractor].some(loc =>
+          loc.company === locationData.company &&
           loc.location === locationData.location
         );
-        
+
         if (!exists) {
           contractorToLocations[contractor].push(locationData);
         }
       });
     });
-    
+
     // Find contractors who share clients or work at different locations of the same company
     const contractors = Object.keys(contractorToLocations);
-    
+
     for (let i = 0; i < contractors.length; i++) {
       for (let j = i + 1; j < contractors.length; j++) {
         const contractorA = contractors[i];
         const contractorB = contractors[j];
-        
+
         const locationsA = contractorToLocations[contractorA] || [];
         const locationsB = contractorToLocations[contractorB] || [];
-        
+
         // Find shared companies (where they work at different locations)
         const sharedCompaniesMap = {};
-        
+
         locationsA.forEach(locA => {
-          const matchingB = locationsB.filter(locB => 
+          const matchingB = locationsB.filter(locB =>
             locB.company === locA.company
           );
-          
+
           if (matchingB.length > 0) {
             if (!sharedCompaniesMap[locA.company]) {
               sharedCompaniesMap[locA.company] = {
@@ -320,17 +290,17 @@ const CompanyMatrixComponent = {
                 bSpecialties: new Set()
               };
             }
-            
+
             sharedCompaniesMap[locA.company].aLocations.push(locA);
             sharedCompaniesMap[locA.company].aSpecialties.add(locA.specialty);
-            
+
             matchingB.forEach(locB => {
               sharedCompaniesMap[locA.company].bLocations.push(locB);
               sharedCompaniesMap[locA.company].bSpecialties.add(locB.specialty);
             });
           }
         });
-        
+
         // Convert to array and process shared companies
         const sharedCompanies = Object.values(sharedCompaniesMap).map(item => ({
           company: item.company,
@@ -340,7 +310,7 @@ const CompanyMatrixComponent = {
           aSpecialties: Array.from(item.aSpecialties),
           bSpecialties: Array.from(item.bSpecialties)
         }));
-        
+
         // Find companies where A worked but B didn't
         const uniqueToA = [];
         locationsA.forEach(locA => {
@@ -365,7 +335,7 @@ const CompanyMatrixComponent = {
             }
           }
         });
-        
+
         // Find companies where B worked but A didn't
         const uniqueToB = [];
         locationsB.forEach(locB => {
@@ -390,12 +360,12 @@ const CompanyMatrixComponent = {
             }
           }
         });
-        
+
         // Create connection opportunity if there are shared companies or unique opportunities
         if (sharedCompanies.length > 0 || (uniqueToA.length > 0 && uniqueToB.length > 0)) {
           const allSpecialtiesA = [...new Set(locationsA.map(l => l.specialty))];
           const allSpecialtiesB = [...new Set(locationsB.map(l => l.specialty))];
-          
+
           connections.push({
             contractorA,
             contractorB,
@@ -410,7 +380,7 @@ const CompanyMatrixComponent = {
         }
       }
     }
-    
+
     this.state.connectionData = connections.sort((a, b) => b.potentialValue - a.potentialValue);
   },
 
@@ -419,9 +389,9 @@ const CompanyMatrixComponent = {
    */
   calculateLocationConnectionValue(sharedCompanies, uniqueA, uniqueB) {
     const tierValues = { 'Enterprise': 100, 'Large': 75, 'Mid': 50, 'Small': 25 };
-    
+
     let value = 0;
-    
+
     // Shared companies = strong relationship building opportunity
     // Value increases with number of different locations
     sharedCompanies.forEach(item => {
@@ -429,18 +399,18 @@ const CompanyMatrixComponent = {
       const locationCount = item.aLocations.length + item.bLocations.length;
       value += baseValue * locationCount * 2;  // High multiplier for shared clients
     });
-    
+
     // Unique companies = introduction opportunities
     uniqueA.forEach(item => {
       const baseValue = tierValues[item.tier] || 25;
       value += baseValue * item.locations.length;
     });
-    
+
     uniqueB.forEach(item => {
       const baseValue = tierValues[item.tier] || 25;
       value += baseValue * item.locations.length;
     });
-    
+
     return value;
   },
 
@@ -452,7 +422,7 @@ const CompanyMatrixComponent = {
     const hasUniqueA = uniqueA.length > 0;
     const hasUniqueB = uniqueB.length > 0;
     const sameSpecialty = specialtiesA.some(s => specialtiesB.includes(s));
-    
+
     if (hasShared && sharedCompanies.length >= 2) {
       return 'Multi-Location Partners';
     } else if (hasShared && !sameSpecialty) {
@@ -470,7 +440,7 @@ const CompanyMatrixComponent = {
    * Main render function
    */
   render() {
-    switch(this.state.viewMode) {
+    switch (this.state.viewMode) {
       case 'excel':
         this.renderExcelView();
         break;
@@ -492,10 +462,10 @@ const CompanyMatrixComponent = {
   renderExcelView() {
     const container = document.getElementById('company-matrix-container');
     if (!container) return;
-    
+
     // Get unique states
     const states = [...new Set(this.state.locations.map(l => l.state))].sort();
-    
+
     // Build Excel grid
     let html = `
       <div style="overflow-x: auto; max-height: 70vh;">
@@ -515,13 +485,13 @@ const CompanyMatrixComponent = {
           </thead>
           <tbody>
     `;
-    
+
     // Add rows for each company
     this.state.companies.forEach(company => {
       const companyLocations = this.state.locations.filter(l => l.company === company.normalized);
       let totalWorked = 0;
       let totalOpportunities = 0;
-      
+
       html += `
         <tr>
           <td style="border: 1px solid var(--border-color); padding: 8px; font-weight: 600; position: sticky; left: 0; background: var(--background);">
@@ -531,19 +501,19 @@ const CompanyMatrixComponent = {
             <span class="badge badge-secondary">${company.tier}</span>
           </td>
       `;
-      
+
       // Add cells for each state
       states.forEach(state => {
         const stateLocations = companyLocations.filter(l => l.state === state);
         const workedCount = stateLocations.filter(l => this.hasWorkedAtLocation(company, l)).length;
         const totalCount = stateLocations.length;
-        
+
         if (workedCount > 0) totalWorked += workedCount;
         if (totalCount - workedCount > 0) totalOpportunities += totalCount - workedCount;
-        
+
         let cellContent = '';
         let cellStyle = 'border: 1px solid var(--border-color); padding: 8px; text-align: center;';
-        
+
         if (totalCount === 0) {
           cellContent = '—';
           cellStyle += ' color: var(--text-muted);';
@@ -557,10 +527,10 @@ const CompanyMatrixComponent = {
           cellContent = `○ ${totalCount}`;
           cellStyle += ' color: var(--text-secondary);';
         }
-        
+
         html += `<td style="${cellStyle}" title="${stateLocations.map(l => l.city).join(', ')}">${cellContent}</td>`;
       });
-      
+
       // Add totals
       html += `
         <td style="border: 1px solid var(--border-color); padding: 8px; text-align: center; background: rgba(16, 185, 129, 0.05); font-weight: 600; color: var(--success-color);">
@@ -572,12 +542,12 @@ const CompanyMatrixComponent = {
       </tr>
       `;
     });
-    
+
     html += `
           </tbody>
         </table>
       </div>
-      
+
       <div style="margin-top: 20px; padding: 16px; background: var(--background-alt); border-radius: 8px;">
         <h4 style="margin-top: 0; margin-bottom: 12px;">Legend</h4>
         <div style="display: flex; gap: 24px; flex-wrap: wrap;">
@@ -588,7 +558,7 @@ const CompanyMatrixComponent = {
         </div>
       </div>
     `;
-    
+
     container.innerHTML = html;
   },
 
@@ -598,12 +568,12 @@ const CompanyMatrixComponent = {
   renderRelationshipView() {
     const container = document.getElementById('company-matrix-container');
     if (!container) return;
-    
+
     if (this.state.relationshipData.length === 0) {
       container.innerHTML = '<div class="table-empty">No cross-company introduction opportunities found</div>';
       return;
     }
-    
+
     let html = `
       <div class="relationship-header" style="margin-bottom: 24px;">
         <h3 style="margin: 0; margin-bottom: 8px;">🤝 Introduction Opportunities</h3>
@@ -611,15 +581,15 @@ const CompanyMatrixComponent = {
           These companies have complementary geographic coverage and could benefit from introductions
         </p>
       </div>
-      
+
       <div class="relationship-grid" style="display: grid; gap: 16px;">
     `;
-    
+
     // Show top relationships
     this.state.relationshipData.slice(0, 10).forEach((rel, index) => {
       const companyA = this.state.companies.find(c => c.name === rel.companyA);
       const companyB = this.state.companies.find(c => c.name === rel.companyB);
-      
+
       html += `
         <div class="relationship-card card" style="padding: 20px; border-left: 4px solid var(--primary-color);">
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
@@ -645,7 +615,7 @@ const CompanyMatrixComponent = {
               </div>
             </div>
           </div>
-          
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
             <div style="padding: 12px; background: rgba(16, 185, 129, 0.05); border-radius: 8px;">
               <div style="font-weight: 600; margin-bottom: 8px; color: var(--success-color);">
@@ -655,7 +625,7 @@ const CompanyMatrixComponent = {
                 ${rel.aStrength.map(s => `<div>• ${s}</div>`).join('')}
               </div>
             </div>
-            
+
             <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-radius: 8px;">
               <div style="font-weight: 600; margin-bottom: 8px; color: var(--primary-color);">
                 ${rel.companyB} knows:
@@ -665,17 +635,17 @@ const CompanyMatrixComponent = {
               </div>
             </div>
           </div>
-          
+
           <div style="margin-top: 16px; padding: 12px; background: var(--background-alt); border-radius: 6px;">
             <div style="font-size: 13px; color: var(--text-secondary);">
-              <strong>💡 Opportunity:</strong> 
-              ${rel.companyA} could introduce ${rel.companyB} to their contacts in 
-              <strong>${rel.aStrength.join(', ')}</strong>, 
-              while ${rel.companyB} could reciprocate with introductions in 
+              <strong>💡 Opportunity:</strong>
+              ${rel.companyA} could introduce ${rel.companyB} to their contacts in
+              <strong>${rel.aStrength.join(', ')}</strong>,
+              while ${rel.companyB} could reciprocate with introductions in
               <strong>${rel.bStrength.join(', ')}</strong>.
             </div>
           </div>
-          
+
           <div style="margin-top: 12px; display: flex; gap: 8px;">
             <button class="btn btn-sm btn-primary" onclick="CompanyMatrixComponent.createIntroduction('${rel.companyA}', '${rel.companyB}')">
               📧 Draft Introduction Email
@@ -687,9 +657,9 @@ const CompanyMatrixComponent = {
         </div>
       `;
     });
-    
+
     html += '</div>';
-    
+
     container.innerHTML = html;
   },
 
@@ -699,12 +669,12 @@ const CompanyMatrixComponent = {
   renderConnectionView() {
     const container = document.getElementById('company-matrix-container');
     if (!container) return;
-    
+
     if (this.state.connectionData.length === 0) {
       container.innerHTML = '<div class="table-empty">No contractor connection opportunities found</div>';
       return;
     }
-    
+
     // Format specialty names
     const formatSpecialty = (spec) => {
       const names = {
@@ -716,30 +686,30 @@ const CompanyMatrixComponent = {
       };
       return names[spec] || spec;
     };
-    
+
     // Get city/state for a location
     const getLocationDetails = (locationName, companyName) => {
       const company = this.state.companies.find(c => c.name === companyName);
       if (!company) return locationName;
-      
-      const location = this.state.locations.find(l => 
+
+      const location = this.state.locations.find(l =>
         l.company === company.normalized && l.name === locationName
       );
-      
+
       return location ? `${locationName} (${location.city}, ${location.state})` : locationName;
     };
-    
+
     let html = `
       <div class="relationship-header" style="margin-bottom: 24px;">
         <h3 style="margin: 0; margin-bottom: 8px;">🔗 Contractor Connections</h3>
         <p style="color: var(--text-secondary); margin: 0;">
-          See which contractors are working at different locations of the same companies - perfect for coordination
+          See which contractors are working at different locations of the same companies — perfect for coordination
         </p>
       </div>
-      
+
       <div class="relationship-grid" style="display: grid; gap: 16px;">
     `;
-    
+
     // Show all connections
     this.state.connectionData.forEach((conn, index) => {
       html += `
@@ -768,7 +738,7 @@ const CompanyMatrixComponent = {
               </div>
             </div>
           </div>
-          
+
           ${conn.sharedCompanies.length > 0 ? `
             <div style="margin-bottom: 16px; padding: 16px; background: rgba(16, 185, 129, 0.08); border-radius: 8px; border: 2px solid rgba(16, 185, 129, 0.2);">
               <div style="font-weight: 600; margin-bottom: 12px; color: var(--success-color); font-size: 15px;">
@@ -789,7 +759,7 @@ const CompanyMatrixComponent = {
                         <div style="font-size: 12px; margin-top: 4px; padding: 4px 0;">
                           <strong>• ${getLocationDetails(loc.location, shared.company)}</strong>
                           <div style="color: var(--text-muted); font-size: 10px; margin-left: 12px;">
-                            ${formatSpecialty(loc.specialty)} • ${loc.projectName}
+                            ${formatSpecialty(loc.specialty)}${loc.projectName ? ` • ${loc.projectName}` : ''}
                           </div>
                         </div>
                       `).join('')}
@@ -802,7 +772,7 @@ const CompanyMatrixComponent = {
                         <div style="font-size: 12px; margin-top: 4px; padding: 4px 0;">
                           <strong>• ${getLocationDetails(loc.location, shared.company)}</strong>
                           <div style="color: var(--text-muted); font-size: 10px; margin-left: 12px;">
-                            ${formatSpecialty(loc.specialty)} • ${loc.projectName}
+                            ${formatSpecialty(loc.specialty)}${loc.projectName ? ` • ${loc.projectName}` : ''}
                           </div>
                         </div>
                       `).join('')}
@@ -818,7 +788,7 @@ const CompanyMatrixComponent = {
               </div>
             </div>
           ` : ''}
-          
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
             ${conn.aCanIntroduce.length > 0 ? `
               <div style="padding: 12px; background: rgba(59, 130, 246, 0.05); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
@@ -835,8 +805,8 @@ const CompanyMatrixComponent = {
                       <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${item.locations.length} location${item.locations.length > 1 ? 's' : ''}: 
                         ${item.locations.slice(0, 2).map(l => {
-                          const loc = this.state.locations.find(location => 
-                            location.name === l.location && 
+                          const loc = this.state.locations.find(location =>
+                            location.name === l.location &&
                             location.company === this.state.companies.find(c => c.name === item.company)?.normalized
                           );
                           return loc ? `${loc.city}, ${loc.state}` : l.location;
@@ -852,7 +822,7 @@ const CompanyMatrixComponent = {
                 </div>
               </div>
             ` : '<div></div>'}
-            
+
             ${conn.bCanIntroduce.length > 0 ? `
               <div style="padding: 12px; background: rgba(139, 92, 246, 0.05); border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.2);">
                 <div style="font-weight: 600; margin-bottom: 8px; color: var(--purple-color, var(--primary-color));">
@@ -868,8 +838,8 @@ const CompanyMatrixComponent = {
                       <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${item.locations.length} location${item.locations.length > 1 ? 's' : ''}: 
                         ${item.locations.slice(0, 2).map(l => {
-                          const loc = this.state.locations.find(location => 
-                            location.name === l.location && 
+                          const loc = this.state.locations.find(location =>
+                            location.name === l.location &&
                             location.company === this.state.companies.find(c => c.name === item.company)?.normalized
                           );
                           return loc ? `${loc.city}, ${loc.state}` : l.location;
@@ -886,14 +856,14 @@ const CompanyMatrixComponent = {
               </div>
             ` : '<div></div>'}
           </div>
-          
+
           <div style="padding: 12px; background: var(--background-alt); border-radius: 6px; margin-bottom: 12px;">
             <div style="font-size: 13px; color: var(--text-secondary);">
               <strong>💡 Why Connect:</strong> 
               ${this.generateLocationConnectionReason(conn)}
             </div>
           </div>
-          
+
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-sm btn-primary" onclick="CompanyMatrixComponent.createContractorIntro('${conn.contractorA}', '${conn.contractorB}')">
               📧 Draft Introduction
@@ -905,9 +875,9 @@ const CompanyMatrixComponent = {
         </div>
       `;
     });
-    
+
     html += '</div>';
-    
+
     container.innerHTML = html;
   },
 
@@ -916,7 +886,7 @@ const CompanyMatrixComponent = {
    */
   generateLocationConnectionReason(conn) {
     if (conn.type === 'Multi-Location Partners') {
-      const totalLocations = conn.sharedCompanies.reduce((sum, company) => 
+      const totalLocations = conn.sharedCompanies.reduce((sum, company) =>
         sum + company.aLocations.length + company.bLocations.length, 0
       );
       return `${conn.contractorA} and ${conn.contractorB} are working at ${totalLocations} different locations across ${conn.sharedCompanies.length} shared ${conn.sharedCompanies.length === 1 ? 'company' : 'companies'}. They should coordinate strategies, share lessons learned, and potentially cross-refer between locations.`;
@@ -935,16 +905,16 @@ const CompanyMatrixComponent = {
    * Create introduction email draft
    */
   createIntroduction(companyA, companyB) {
-    const rel = this.state.relationshipData.find(r => 
+    const rel = this.state.relationshipData.find(r =>
       (r.companyA === companyA && r.companyB === companyB) ||
       (r.companyA === companyB && r.companyB === companyA)
     );
-    
+
     if (!rel) {
       alert('Relationship data not found');
       return;
     }
-    
+
     // Create email template
     const emailTemplate = `
 Subject: Introduction: ${companyA} ↔ ${companyB}
@@ -962,7 +932,7 @@ Would you both be interested in a brief introductory call to explore potential a
 Best regards,
 [Your Name]
     `.trim();
-    
+
     // In production, this would open an email composer
     alert('Email Template:\n\n' + emailTemplate);
   },
@@ -971,16 +941,16 @@ Best regards,
    * View detailed relationship analysis
    */
   viewRelationshipDetails(companyA, companyB) {
-    const rel = this.state.relationshipData.find(r => 
+    const rel = this.state.relationshipData.find(r =>
       (r.companyA === companyA && r.companyB === companyB) ||
       (r.companyA === companyB && r.companyB === companyA)
     );
-    
+
     if (!rel) {
       alert('Relationship data not found');
       return;
     }
-    
+
     // Show detailed analysis
     alert(`
 Relationship Analysis: ${companyA} ↔ ${companyB}
@@ -1006,28 +976,28 @@ This relationship offers strong potential for:
    * Create contractor introduction email
    */
   createContractorIntro(contractorA, contractorB) {
-    const conn = this.state.connectionData.find(c => 
+    const conn = this.state.connectionData.find(c =>
       (c.contractorA === contractorA && c.contractorB === contractorB) ||
       (c.contractorA === contractorB && c.contractorB === contractorA)
     );
-    
+
     if (!conn) {
       alert('Connection data not found');
       return;
     }
-    
-    const sharedText = conn.sharedCompanies.length > 0 
+
+    const sharedText = conn.sharedCompanies.length > 0
       ? `\n\nYou're both working at different locations of ${conn.sharedCompanies.map(s => s.company).join(', ')}. This presents great opportunities for coordination and knowledge sharing.`
       : '';
-    
+
     const introAText = conn.aCanIntroduce.length > 0
       ? `\n\n${conn.contractorA} has relationships at: ${conn.aCanIntroduce.slice(0, 3).map(c => c.company).join(', ')}${conn.aCanIntroduce.length > 3 ? ' and others' : ''}.`
       : '';
-    
+
     const introBText = conn.bCanIntroduce.length > 0
       ? `\n${conn.contractorB} has relationships at: ${conn.bCanIntroduce.slice(0, 3).map(c => c.company).join(', ')}${conn.bCanIntroduce.length > 3 ? ' and others' : ''}.`
       : '';
-    
+
     const emailTemplate = `
 Subject: Introduction: ${contractorA} ↔ ${contractorB}
 
@@ -1046,7 +1016,7 @@ Would you both be open to a brief call to explore how you might work together?
 Best regards,
 [Your Name]
     `.trim();
-    
+
     alert('Email Template:\n\n' + emailTemplate);
   },
 
@@ -1054,16 +1024,16 @@ Best regards,
    * View location-based connection details
    */
   viewLocationConnectionDetails(contractorA, contractorB) {
-    const conn = this.state.connectionData.find(c => 
+    const conn = this.state.connectionData.find(c =>
       (c.contractorA === contractorA && c.contractorB === contractorB) ||
       (c.contractorA === contractorB && c.contractorB === contractorA)
     );
-    
+
     if (!conn) {
       alert('Connection data not found');
       return;
     }
-    
+
     const formatSpecialty = (spec) => {
       const names = {
         'electrical': 'Electrical',
@@ -1074,9 +1044,9 @@ Best regards,
       };
       return names[spec] || spec;
     };
-    
+
     let details = `Location-Based Connection Analysis\n${contractorA} ↔ ${contractorB}\n\nType: ${conn.type}\nConnection Score: ${conn.potentialValue}\n\n`;
-    
+
     if (conn.sharedCompanies.length > 0) {
       details += `WORKING AT DIFFERENT LOCATIONS OF SHARED COMPANIES (${conn.sharedCompanies.length}):\n\n`;
       conn.sharedCompanies.forEach(shared => {
@@ -1092,7 +1062,7 @@ Best regards,
         details += '\n';
       });
     }
-    
+
     if (conn.aCanIntroduce.length > 0) {
       details += `${contractorA.toUpperCase()} CAN INTRODUCE TO:\n`;
       conn.aCanIntroduce.forEach(item => {
@@ -1103,7 +1073,7 @@ Best regards,
       });
       details += '\n';
     }
-    
+
     if (conn.bCanIntroduce.length > 0) {
       details += `${contractorB.toUpperCase()} CAN INTRODUCE TO:\n`;
       conn.bCanIntroduce.forEach(item => {
@@ -1113,8 +1083,37 @@ Best regards,
         });
       });
     }
-    
+
     alert(details.trim());
+  },
+
+  /**
+   * Get contractors who worked at a specific location (based on actual projects)
+   */
+  getLocationContractors(company, location) {
+    // Projects for this location
+    const locationProjects = this.state.projects.filter(p =>
+      p.company === company.name && p.location === location.name
+    );
+
+    if (locationProjects.length === 0) return [];
+
+    // Map the company's contractor assignments to badges
+    const contractors = [];
+    const companyData = this.state.companies.find(c => c.name === company.name);
+
+    if (companyData && companyData.contractors) {
+      Object.entries(companyData.contractors).forEach(([specialty, contractor]) => {
+        if (contractor) {
+          contractors.push({
+            name: contractor,
+            specialty: specialty
+          });
+        }
+      });
+    }
+
+    return contractors;
   },
 
   /**
@@ -1122,17 +1121,17 @@ Best regards,
    */
   hasWorkedAtLocation(company, location) {
     // Check projects
-    const hasProject = this.state.projects.some(p => 
+    const hasProject = this.state.projects.some(p =>
       p.company === company.name && p.location === location.name
     );
-    
+
     // Check completed opportunities
-    const hasCompletedOpp = this.state.opportunities.some(o => 
-      o.company === company.name && 
-      o.location === location.name && 
+    const hasCompletedOpp = this.state.opportunities.some(o =>
+      o.company === company.name &&
+      o.location === location.name &&
       o.status === 'Closed-Won'
     );
-    
+
     return hasProject || hasCompletedOpp;
   },
 
@@ -1141,17 +1140,17 @@ Best regards,
    */
   getLocationInvoicedAmount(company, location) {
     let total = 0;
-    
+
     // Sum project valuations
-    const locationProjects = this.state.projects.filter(p => 
+    const locationProjects = this.state.projects.filter(p =>
       p.company === company.name && p.location === location.name
     );
-    
+
     locationProjects.forEach(project => {
       const value = this.parseValuation(project.valuation);
       total += value;
     });
-    
+
     return total;
   },
 
@@ -1161,16 +1160,16 @@ Best regards,
   parseValuation(valuation) {
     if (!valuation) return 0;
     if (typeof valuation === 'number') return valuation;
-    
+
     const cleaned = valuation.toString().replace(/[$,]/g, '');
-    
+
     if (cleaned.includes('K')) {
       return parseFloat(cleaned.replace('K', '')) * 1000;
     }
     if (cleaned.includes('M')) {
       return parseFloat(cleaned.replace('M', '')) * 1000000;
     }
-    
+
     return parseFloat(cleaned) || 0;
   },
 
@@ -1190,8 +1189,8 @@ Best regards,
    * Get contacts for a location
    */
   getLocationContacts(company, location) {
-    return this.state.contacts.filter(c => 
-      c.company === company.normalized && 
+    return this.state.contacts.filter(c =>
+      c.company === company.normalized &&
       c.location === location.name
     );
   },
@@ -1202,38 +1201,38 @@ Best regards,
   renderStatistics() {
     const totalCompanies = this.state.companies.length;
     const totalLocations = this.state.locations.length;
-    
+
     let workedLocations = 0;
     let unworkedLocations = 0;
     let totalInvoiced = 0;
     let locationsWithContacts = 0;
-    
+
     this.state.companies.forEach(company => {
-      const companyLocations = this.state.locations.filter(l => 
+      const companyLocations = this.state.locations.filter(l =>
         l.company === company.normalized
       );
-      
+
       companyLocations.forEach(location => {
         const hasWorked = this.hasWorkedAtLocation(company, location);
         const invoiced = this.getLocationInvoicedAmount(company, location);
         const contacts = this.getLocationContacts(company, location);
-        
+
         if (hasWorked) {
           workedLocations++;
           totalInvoiced += invoiced;
         } else {
           unworkedLocations++;
         }
-        
+
         if (contacts.length > 0) {
           locationsWithContacts++;
         }
       });
     });
-    
-    const coveragePercent = totalLocations > 0 ? 
+
+    const coveragePercent = totalLocations > 0 ?
       Math.round((workedLocations / totalLocations) * 100) : 0;
-    
+
     const statsContainer = document.getElementById('matrix-stats');
     if (statsContainer) {
       statsContainer.innerHTML = `
@@ -1273,42 +1272,42 @@ Best regards,
   renderMatrix() {
     const container = document.getElementById('company-matrix-container');
     if (!container) return;
-    
+
     if (this.state.companies.length === 0) {
       container.innerHTML = '<div class="table-empty">No companies found</div>';
       return;
     }
-    
+
     // Apply filters
     let filteredCompanies = [...this.state.companies];
-    
+
     if (this.state.filters.search) {
       const search = this.state.filters.search.toLowerCase();
-      filteredCompanies = filteredCompanies.filter(company => 
+      filteredCompanies = filteredCompanies.filter(company =>
         company.name.toLowerCase().includes(search) ||
         company.tier?.toLowerCase().includes(search)
       );
     }
-    
+
     if (this.state.filters.tier) {
-      filteredCompanies = filteredCompanies.filter(company => 
+      filteredCompanies = filteredCompanies.filter(company =>
         company.tier === this.state.filters.tier
       );
     }
-    
+
     // Build matrix HTML
     const matrixHTML = filteredCompanies.map(company => {
-      const companyLocations = this.state.locations.filter(l => 
+      const companyLocations = this.state.locations.filter(l =>
         l.company === company.normalized
       );
-      
+
       const isExpanded = this.state.expandedCompanies.has(company.normalized);
-      
+
       // Calculate company stats
       let companyWorkedCount = 0;
       let companyUnworkedCount = 0;
       let companyInvoiced = 0;
-      
+
       companyLocations.forEach(location => {
         const hasWorked = this.hasWorkedAtLocation(company, location);
         if (hasWorked) {
@@ -1318,26 +1317,26 @@ Best regards,
           companyUnworkedCount++;
         }
       });
-      
+
       // Apply location filters
       let displayLocations = companyLocations;
       if (this.state.filters.showOnlyWorked) {
-        displayLocations = companyLocations.filter(l => 
+        displayLocations = companyLocations.filter(l =>
           this.hasWorkedAtLocation(company, l)
         );
       } else if (this.state.filters.showOnlyUnworked) {
-        displayLocations = companyLocations.filter(l => 
+        displayLocations = companyLocations.filter(l =>
           !this.hasWorkedAtLocation(company, l)
         );
       }
-      
+
       if (displayLocations.length === 0 && (this.state.filters.showOnlyWorked || this.state.filters.showOnlyUnworked)) {
         return ''; // Skip company if no locations match filter
       }
-      
+
       return `
         <div class="card" style="margin-bottom: 20px;">
-          <div class="card-header" style="cursor: pointer; user-select: none;" 
+          <div class="card-header" style="cursor: pointer; user-select: none;"
                onclick="CompanyMatrixComponent.toggleCompany('${company.normalized}')">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; gap: 12px;">
@@ -1374,7 +1373,7 @@ Best regards,
               </div>
             </div>
           </div>
-          
+
           ${isExpanded ? `
             <div class="card-body">
               ${displayLocations.length > 0 ? `
@@ -1389,7 +1388,7 @@ Best regards,
         </div>
       `;
     }).join('');
-    
+
     container.innerHTML = matrixHTML || '<div class="table-empty">No companies match the current filters</div>';
   },
 
@@ -1401,15 +1400,15 @@ Best regards,
     const invoiced = this.getLocationInvoicedAmount(company, location);
     const contacts = this.getLocationContacts(company, location);
     const contractors = this.getLocationContractors(company, location);
-    
+
     // Get projects for this location
-    const locationProjects = this.state.projects.filter(p => 
+    const locationProjects = this.state.projects.filter(p =>
       p.company === company.name && p.location === location.name
     );
-    
+
     const cardClass = hasWorked ? 'location-worked' : 'location-opportunity';
     const borderColor = hasWorked ? 'var(--success-color)' : 'var(--warning-color)';
-    
+
     // Format specialty names
     const formatSpecialty = (spec) => {
       const names = {
@@ -1421,7 +1420,7 @@ Best regards,
       };
       return names[spec] || spec;
     };
-    
+
     return `
       <div class="location-card ${cardClass}" 
            style="padding: 16px; border: 2px solid ${borderColor}; border-radius: 8px; background: var(--background); cursor: pointer; transition: all 0.3s;"
@@ -1438,7 +1437,7 @@ Best regards,
             ${hasWorked ? '✓ Worked' : '○ Opportunity'}
           </span>
         </div>
-        
+
         ${contractors.length > 0 ? `
           <div style="margin-bottom: 12px; padding: 10px; background: rgba(99, 102, 241, 0.08); border-radius: 6px; border-left: 3px solid var(--primary-color);">
             <div style="font-size: 11px; font-weight: 600; color: var(--primary-color); margin-bottom: 6px;">
@@ -1453,7 +1452,7 @@ Best regards,
             </div>
           </div>
         ` : ''}
-        
+
         ${hasWorked ? `
           <div style="margin-bottom: 12px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1472,7 +1471,7 @@ Best regards,
             </div>
           </div>
         ` : ''}
-        
+
         <div style="padding: 12px; background: var(--background-alt); border-radius: 6px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">
@@ -1482,7 +1481,7 @@ Best regards,
               <span style="font-size: 10px; color: var(--error-color);">No contacts</span>
             ` : ''}
           </div>
-          
+
           ${contacts.length > 0 ? `
             <div style="display: flex; flex-direction: column; gap: 6px;">
               ${contacts.slice(0, 2).map(contact => `
@@ -1511,7 +1510,7 @@ Best regards,
             </button>
           `}
         </div>
-        
+
         <div style="margin-top: 12px; text-align: center;">
           <button class="btn btn-sm btn-ghost" style="width: 100%;">
             View Details →
@@ -1526,26 +1525,26 @@ Best regards,
    */
   showLocationDetails(companyId, locationName) {
     const company = this.state.companies.find(c => c.normalized === companyId);
-    const location = this.state.locations.find(l => 
+    const location = this.state.locations.find(l =>
       l.company === companyId && l.name === locationName
     );
-    
+
     if (!company || !location) return;
-    
+
     const hasWorked = this.hasWorkedAtLocation(company, location);
     const invoiced = this.getLocationInvoicedAmount(company, location);
     const contacts = this.getLocationContacts(company, location);
-    
+
     // Get projects
-    const locationProjects = this.state.projects.filter(p => 
+    const locationProjects = this.state.projects.filter(p =>
       p.company === company.name && p.location === location.name
     );
-    
+
     // Get opportunities
-    const locationOpportunities = this.state.opportunities.filter(o => 
+    const locationOpportunities = this.state.opportunities.filter(o =>
       o.company === company.name && o.location === location.name
     );
-    
+
     // Create modal
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop active';
@@ -1568,7 +1567,7 @@ Best regards,
               </span>
             </div>
           </div>
-          
+
           ${hasWorked ? `
             <div class="card" style="padding: 20px; margin-bottom: 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%);">
               <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--success-color);">Work History</h4>
@@ -1588,7 +1587,7 @@ Best regards,
                   <div style="font-size: 24px; font-weight: bold;">${locationOpportunities.length}</div>
                 </div>
               </div>
-              
+
               ${locationProjects.length > 0 ? `
                 <div>
                   <h5 style="margin-bottom: 12px;">Projects</h5>
@@ -1624,7 +1623,7 @@ Best regards,
             <div class="card" style="padding: 20px; margin-bottom: 20px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%);">
               <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--warning-color);">Opportunity Details</h4>
               <p style="color: var(--text-secondary);">This location has not been worked yet. It represents a potential opportunity for business development.</p>
-              
+
               ${locationOpportunities.length > 0 ? `
                 <div style="margin-top: 16px;">
                   <h5 style="margin-bottom: 12px;">Open Opportunities</h5>
@@ -1649,7 +1648,7 @@ Best regards,
               ` : ''}
             </div>
           `}
-          
+
           <div class="card" style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <h4 style="margin: 0;">Contacts (${contacts.length})</h4>
@@ -1658,7 +1657,7 @@ Best regards,
                 + Add Contact
               </button>
             </div>
-            
+
             ${contacts.length > 0 ? `
               <div class="table-wrapper" style="max-height: 300px; overflow-y: auto;">
                 <table class="table">
@@ -1702,7 +1701,7 @@ Best regards,
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
   },
 
@@ -1723,11 +1722,11 @@ Best regards,
    */
   getRelativeTime(dateStr) {
     if (!dateStr) return 'Never';
-    
+
     const date = new Date(dateStr);
     const now = new Date();
     const diffInDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    
+
     if (diffInDays === 0) return 'Today';
     if (diffInDays === 1) return 'Yesterday';
     if (diffInDays < 7) return `${diffInDays}d ago`;
@@ -1763,7 +1762,7 @@ Best regards,
         this.render();
       }, 300));
     }
-    
+
     // View mode buttons
     const viewCardsBtn = document.getElementById('view-cards');
     if (viewCardsBtn) {
@@ -1778,7 +1777,7 @@ Best regards,
         this.render();
       });
     }
-    
+
     const viewExcelBtn = document.getElementById('view-excel');
     if (viewExcelBtn) {
       viewExcelBtn.addEventListener('click', () => {
@@ -1792,7 +1791,7 @@ Best regards,
         this.render();
       });
     }
-    
+
     const viewRelationshipsBtn = document.getElementById('view-relationships');
     if (viewRelationshipsBtn) {
       viewRelationshipsBtn.addEventListener('click', () => {
@@ -1806,7 +1805,7 @@ Best regards,
         this.render();
       });
     }
-    
+
     const viewConnectionsBtn = document.getElementById('view-connections');
     if (viewConnectionsBtn) {
       viewConnectionsBtn.addEventListener('click', () => {
@@ -1820,7 +1819,7 @@ Best regards,
         this.render();
       });
     }
-    
+
     // Filter buttons
     const showWorkedBtn = document.getElementById('show-worked-only');
     if (showWorkedBtn) {
@@ -1828,40 +1827,40 @@ Best regards,
         this.state.filters.showOnlyWorked = !this.state.filters.showOnlyWorked;
         this.state.filters.showOnlyUnworked = false; // Reset other filter
         showWorkedBtn.classList.toggle('btn-primary', this.state.filters.showOnlyWorked);
-        showWorkedBtn.textContent = this.state.filters.showOnlyWorked ? 
+        showWorkedBtn.textContent = this.state.filters.showOnlyWorked ?
           'Show All Locations' : 'Show Worked Only';
-        
+
         // Reset unworked button
         const unworkedBtn = document.getElementById('show-unworked-only');
         if (unworkedBtn) {
           unworkedBtn.classList.remove('btn-primary');
           unworkedBtn.textContent = 'Show Opportunities Only';
         }
-        
+
         this.render();
       });
     }
-    
+
     const showUnworkedBtn = document.getElementById('show-unworked-only');
     if (showUnworkedBtn) {
       showUnworkedBtn.addEventListener('click', () => {
         this.state.filters.showOnlyUnworked = !this.state.filters.showOnlyUnworked;
         this.state.filters.showOnlyWorked = false; // Reset other filter
         showUnworkedBtn.classList.toggle('btn-primary', this.state.filters.showOnlyUnworked);
-        showUnworkedBtn.textContent = this.state.filters.showOnlyUnworked ? 
+        showUnworkedBtn.textContent = this.state.filters.showOnlyUnworked ?
           'Show All Locations' : 'Show Opportunities Only';
-        
+
         // Reset worked button
         const workedBtn = document.getElementById('show-worked-only');
         if (workedBtn) {
           workedBtn.classList.remove('btn-primary');
           workedBtn.textContent = 'Show Worked Only';
         }
-        
+
         this.render();
       });
     }
-    
+
     // Tier filter
     const tierFilter = document.getElementById('matrix-tier-filter');
     if (tierFilter) {
@@ -1870,7 +1869,7 @@ Best regards,
         this.render();
       });
     }
-    
+
     // Expand/Collapse all
     const expandAllBtn = document.getElementById('expand-all-btn');
     if (expandAllBtn) {
@@ -1881,7 +1880,7 @@ Best regards,
         this.render();
       });
     }
-    
+
     const collapseAllBtn = document.getElementById('collapse-all-btn');
     if (collapseAllBtn) {
       collapseAllBtn.addEventListener('click', () => {
@@ -1913,4 +1912,4 @@ Best regards,
 // Make available globally
 window.CompanyMatrixComponent = CompanyMatrixComponent;
 
-console.log('📊 Enhanced Company Matrix Component loaded (LOCATION-BASED WITH CONTRACTOR VISIBILITY)');
+console.log('📊 Enhanced Company Matrix Component loaded (CONTRACTOR VISIBILITY VERSION)');
