@@ -1,6 +1,7 @@
 /**
  * Enhanced Dashboard Component with Interactive US Map
- * Displays comprehensive network visualization with zoom, filtering, and relationship mapping
+ * Complete replacement for components/dashboard.js
+ * Combines KPIs, interactive map, and activity tracking
  */
 
 const DashboardComponent = {
@@ -8,7 +9,12 @@ const DashboardComponent = {
   state: {
     companies: [],
     locations: [],
+    contacts: [],
+    gifts: [],
+    referrals: [],
+    opportunities: [],
     projects: [],
+    changeLog: [],
     selectedCompanies: new Set(),
     selectedContractors: new Set(),
     zoomLevel: 1,
@@ -18,7 +24,8 @@ const DashboardComponent = {
     dragStartX: 0,
     dragStartY: 0,
     hoveredLocation: null,
-    searchTerm: ''
+    searchTerm: '',
+    currentOrg: null
   },
 
   // US State coordinates (centroids for detailed map)
@@ -100,9 +107,28 @@ const DashboardComponent = {
    * Load all required data
    */
   async loadData() {
-    this.state.companies = await DataService.getCompanies();
-    this.state.locations = await DataService.getLocations();
-    this.state.projects = await DataService.getProjects();
+    // Get current org
+    this.state.currentOrg = VisibilityService.getCurrentOrg();
+    
+    // Get all data from cache
+    const companies = await DataService.getCompanies();
+    const contacts = await DataService.getContacts();
+    const gifts = await DataService.getGifts();
+    const referrals = await DataService.getReferrals();
+    const opportunities = await DataService.getOpportunities();
+    const projects = await DataService.getProjects();
+    const changeLog = await DataService.getChangeLog();
+    const locations = await DataService.getLocations();
+
+    // Filter data using VisibilityService methods
+    this.state.companies = VisibilityService.filterCompanies(companies, this.state.currentOrg);
+    this.state.contacts = VisibilityService.filterContacts(contacts, companies, this.state.currentOrg);
+    this.state.gifts = VisibilityService.filterGifts(gifts, contacts, companies, this.state.currentOrg);
+    this.state.referrals = VisibilityService.filterReferrals(referrals, contacts, companies, this.state.currentOrg);
+    this.state.opportunities = VisibilityService.filterOpportunities(opportunities, companies, this.state.currentOrg);
+    this.state.projects = VisibilityService.filterProjects(projects, companies, this.state.currentOrg);
+    this.state.changeLog = VisibilityService.filterChangeLog(changeLog, this.state.currentOrg);
+    this.state.locations = VisibilityService.filterLocations(locations, companies, this.state.currentOrg);
     
     // Select all companies by default
     this.state.companies.forEach(c => this.state.selectedCompanies.add(c.name));
@@ -192,7 +218,6 @@ const DashboardComponent = {
     const statesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     statesGroup.id = 'states-group';
 
-    // Draw state boundaries (simplified rectangles for each state region)
     Object.entries(this.stateCoords).forEach(([stateCode, coords]) => {
       const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       
@@ -834,16 +859,17 @@ const DashboardComponent = {
   },
 
   /**
-   * Refresh dashboard
+   * Refresh dashboard (called when org changes)
    */
   async refresh() {
     console.log('🔄 Refreshing dashboard...');
     await this.loadData();
     await this.render();
+    this.setupEventListeners();
   }
 };
 
 // Make available globally
 window.DashboardComponent = DashboardComponent;
 
-console.log('📊 Enhanced Dashboard Component loaded');
+console.log('📊 Enhanced Dashboard Component loaded and ready');
